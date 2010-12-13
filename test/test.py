@@ -7,9 +7,10 @@ test suite for csub 0.9/1.0
 """
 
 import re
+import sys
 import os
 import os.path as op
-import sys
+import glob
 import random
 import inspect
 import unittest
@@ -432,6 +433,8 @@ if __name__ == '__main__':
     tests = unittest.TestSuite([file_suite, re_suite, time_suite, tmp_suite])
     unittest.TextTestRunner(verbosity=2).run(tests)
 
+    for f in glob.glob("%s.py[oc]" % op.splitext(PROGFILE)[0]):
+        os.remove(f) 
 
 """
 testFailSubs (__main__.FileTest) ... ok
