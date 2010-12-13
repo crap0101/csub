@@ -7,13 +7,17 @@ test suite for csub 0.9/1.0
 """
 
 import re
+import os
+import os.path as op
 import sys
 import random
 import inspect
 import unittest
 import StringIO
 import subprocess as sbp
-import csub
+
+
+PROGFILE = 'csub.py'
 
 
 FAKESUB_0 = """1567
@@ -206,7 +210,7 @@ class FileTest (unittest.TestCase):
     def testOkSubs (self):
         options = ["-H", "-M", "-S", "-m", "-n"]
         lenopt = len(options)
-        cmdline = ["python", "csub.py"]
+        cmdline = ["python", PROGFILE]
         for sub in (FAKESUB_0, FAKESUB_1, FAKESUB_2):
             choosed = cmdline[:]
             back_to = cmdline[:]
@@ -236,7 +240,7 @@ class FileTest (unittest.TestCase):
                      FAKESUB_5_FAIL_TIME, FAKESUB_6_FAIL_TIME,]
         for sub in fail_list:
             fpipe = sbp.Popen(["echo", "-n"], stdout=sbp.PIPE)
-            spipe = sbp.Popen(["python", "csub.py"],
+            spipe = sbp.Popen(["python", PROGFILE],
                               stdin=fpipe.stdout, stdout=sbp.PIPE)
             out = spipe.communicate()[0]
             retcode = spipe.returncode
@@ -415,12 +419,19 @@ class TempFileTest (unittest.TestCase):
 
 
 if __name__ == '__main__':
+    
+    progdir = op.split(op.dirname(op.realpath(__file__)))[0]
+    sys.path.insert(0, progdir)
+    import csub
+    PROGFILE = op.join(op.split(op.dirname(op.realpath(__file__)))[0], 'csub.py')
+
     file_suite = unittest.TestLoader().loadTestsFromTestCase(FileTest)
     re_suite = unittest.TestLoader().loadTestsFromTestCase(ReTest)
     time_suite = unittest.TestLoader().loadTestsFromTestCase(TimeTransformTest)
     tmp_suite = unittest.TestLoader().loadTestsFromTestCase(TempFileTest)
     tests = unittest.TestSuite([file_suite, re_suite, time_suite, tmp_suite])
     unittest.TextTestRunner(verbosity=2).run(tests)
+
 
 """
 testFailSubs (__main__.FileTest) ... ok
@@ -435,8 +446,7 @@ testTempFileObjects (__main__.TempFileTest) ... ok
 testTempSafety (__main__.TempFileTest) ... ok
 
 ----------------------------------------------------------------------
-Ran 10 tests in 0.725s
+Ran 10 tests in 0.549s
 
 OK
-
 """
