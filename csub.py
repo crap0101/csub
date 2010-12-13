@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""csub 0.9 - utility to synchronize subtitle files (actually: *.srt)
+VERSION = '1.0'
+
+"""csub %s - utility to synchronize subtitle files (actually: *.srt)
 
 # Copyright (C) 2010  Marco Chieppa (aka crap0101)
 # This program is free software; you can redistribute it and/or modify
@@ -24,7 +26,7 @@ Changelog (2010-07-11):
 Examples:
   ~$ ./prog_name --minutes 3 --seconds -44 --milliseconds -378 -num 2
   ~$ ./prog_name -M -1 -S 4 -i film_sub.srt -o newfile.srt
-"""
+""" % VERSION
 
 #################
 # I M P O R T S #
@@ -240,7 +242,7 @@ class Subtitle (object):
 
 
 class SrtSub (Subtitle):
-    """Class to manage *.srt subtitle. Inherit form Subtitle. """
+    """Class to manage *.srt subtitle. Inherit from Subtitle. """
 
     def __init__ (self, file_in, file_out, unsafe_mode=False):
         self.time_sep = " --> "
@@ -305,7 +307,7 @@ if __name__ == '__main__':
     out_file = sys.stdout
     tmpfile = TempFile(None)
 
-    parser = OptionParser(version="csub 0.8")
+    parser = OptionParser(version="csub %s" % VERSION)
     parser.add_option("--info", dest="info", action="store_true",
                       help="print informations about the program and exit.")
     parser.add_option("-o", "--output-file",type="string",
