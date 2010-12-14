@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-test suite for csub 0.9/1.0
+test suite for csub
 
 """
 
