@@ -11,6 +11,7 @@ import sys
 import os
 import os.path as op
 import glob
+import copy
 import random
 import inspect
 import unittest
@@ -253,7 +254,7 @@ class FileTest (unittest.TestCase):
                            FAKESUB_8_FAIL_INDEX, 
                            FAKESUB_9_FAIL_INDEX,):
             sub = StringIO.StringIO(sub_string)
-            newsub = csub.SrtSub(sub, sub)
+            newsub = csub.SrtSub(sub, copy.deepcopy(sub))
             self.assertRaises(csub.IndexNumError, newsub.main)
 
     def testUnhandledError (self):
@@ -412,11 +413,17 @@ class TempFileTest (unittest.TestCase):
         orig = StringIO.StringIO(FAKESUB_0_FAIL_TIME_IF_NOT_B)
         sub = StringIO.StringIO(FAKESUB_0_FAIL_TIME_IF_NOT_B)
         tmpfile = csub.TempFile(sub)
-        newsub = csub.SrtSub(sub, sub)
+        newsub = csub.SrtSub(sub, copy.deepcopy(sub))
         self.assertRaises(csub.MismatchTimeError, newsub.main)
         tmpfile.write_back()
-        orig.seek(0);sub.seek(0)
+        orig.seek(0)
+        sub.seek(0)
         self.assertEqual(orig.read(), sub.read(), "sub file should be untouched!")
+        # unsafe mode, no error should be raised:
+        orig = StringIO.StringIO(FAKESUB_0_FAIL_TIME_IF_NOT_B)
+        sub = StringIO.StringIO(FAKESUB_0_FAIL_TIME_IF_NOT_B)
+        tmpfile = csub.TempFile(sub)
+        newsub = csub.SrtSub(sub, sub, True)
 
 
 if __name__ == '__main__':

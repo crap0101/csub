@@ -181,7 +181,9 @@ class Subtitle (object):
         self.delta_ms = self.delta_sub_num = 0
         self.IS_BLOCK = True
         self.IS_WARN = False
-        self.actual_line = 0
+        self.actual_numline = 0
+        self.start_sub_num = None
+        self.end_sub_num = None
 
     def set_delta (self, hour, min_, sec, ms, sub_number):
         """Set time's attribute. """
@@ -190,13 +192,6 @@ class Subtitle (object):
         self.delta_sec = sec
         self.delta_ms = ms
         self.delta_sub_num = sub_number
-
-    def parse (self, lines, itertools_cycle_iterator):
-        """Iterate over subtitle's ``lines''"""
-        get_func = GetFunc(itertools_cycle_iterator)
-        for line, n in zip(lines, itertools.count(1)):
-            self.actual_line = n
-            yield "%s\n" % get_func(line)
 
     def make_iter_blocks (self, *methods):
         """Returns an itertools.cycle object for *methods. """
@@ -233,6 +228,13 @@ class Subtitle (object):
             total_sec += sec_to_add
         return total_sec, abs(new_ms)
 
+    def parse (self, lines, itertools_cycle_iterator):
+        """Iterate over subtitle's ``lines''"""
+        get_func = GetFunc(itertools_cycle_iterator)
+        for line, n in zip(lines, itertools.count(1)):
+            self.actual_numline = n
+            yield "%s\n" % get_func(line)
+
     def times_from_secs (self, total_sec):
         """Returns a tuple of (hour, minutes, secs)
         from a time expressed in seconds.
@@ -242,7 +244,9 @@ class Subtitle (object):
 
 
 class SrtSub (Subtitle):
-    """Class to manage *.srt subtitle. Inherit from Subtitle. """
+    """Class to manage *.srt subtitle. Inherit from Subtitle.
+    `file_in' and `file_out' must be file-like objects.
+    """
 
     def __init__ (self, file_in, file_out, unsafe_mode=False):
         self.time_sep = " --> "
@@ -267,7 +271,7 @@ class SrtSub (Subtitle):
             start, end = map(str.strip, time_string.split(self.time_sep))
         except ValueError:
             raise MismatchTimeError("[at line %d] '%s' (in %s)"
-                 % (self.actual_line, time_string, "time_block"))
+                 % (self.actual_numline, time_string, "time_block"))
         h, m, s, ms = map(int, self.match_time(start).group(1, 2, 3, 4))
         sec, ms = self.new_time_tuple(h, m, s, ms)
         nh, nm, ns = self.times_from_secs(sec)
@@ -289,7 +293,7 @@ class SrtSub (Subtitle):
         cycle = self.make_iter_blocks(self.num_block,
                                       self.time_block,
                                       self.text_block)
-        new_lines = self.parse(self.file_in.readlines(), cycle)
+        new_lines = self.parse(self.file_in, cycle)
         if self.file_in is self.file_out:
             self.file_out.seek(0)
             self.file_out.truncate()
@@ -360,7 +364,7 @@ if __name__ == '__main__':
         newsub.main()
     except (MismatchTimeError, IndexNumError), e:
         sys.stderr.write("[at line %d] %s: %s\n"
-             % (newsub.actual_line, e.__class__.__name__, e))
+             % (newsub.actual_numline, e.__class__.__name__, e))
         tmpfile.write_back()
     except Exception, e:
         tmpfile.write_back()
