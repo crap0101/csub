@@ -443,20 +443,3 @@ if __name__ == '__main__':
     for f in glob.glob("%s.py[oc]" % op.splitext(PROGFILE)[0]):
         os.remove(f) 
 
-"""
-testFailSubs (__main__.FileTest) ... ok
-testIndex (__main__.FileTest) ... ok
-testOkSubs (__main__.FileTest) ... ok
-testUnhandledError (__main__.FileTest) ... ok
-testReNumber (__main__.ReTest) ... ok
-testReTime (__main__.ReTest) ... ok
-testTimeCalc (__main__.TimeTransformTest) ... ok
-testTimeSep (__main__.TimeTransformTest) ... ok
-testTempFileObjects (__main__.TempFileTest) ... ok
-testTempSafety (__main__.TempFileTest) ... ok
-
-----------------------------------------------------------------------
-Ran 10 tests in 0.549s
-
-OK
-"""

@@ -91,13 +91,11 @@ class TempFile (object):
                 'prefix': 'subtitle_',
                 'text': True,}
         self.opts.update(options or {})
-        self.fd_max_pos = None
         self.input_file_stream = file_stream
         self.fd, self.filepath = mkstemp(**self.opts)
-        self.start_pos = self.input_file_stream.tell()
         self.fd_max_pos = os.write(self.fd, self.input_file_stream.read())
-        os.lseek(self.fd, 0, 0)
-        self.input_file_stream.seek(self.start_pos)
+        self.input_file_stream.seek(0)
+        self.seek(0, 0)
 
     def close (self):
         os.close(self.fd)
@@ -107,9 +105,10 @@ class TempFile (object):
 
     def seek (self, pos, how):
         return os.lseek(self.fd, pos, how)
-    
+
     def write_back (self):
-        self.input_file_stream.seek(self.start_pos)
+        self.input_file_stream.seek(0)
+        self.seek(0, 0)
         self.input_file_stream.write(self.read())
         self.input_file_stream.truncate()
 
@@ -313,14 +312,18 @@ class SrtSub (Subtitle):
 
     def main (self):
         """Doing the job. """
+        samefile = False
+        if self.file_in is self.file_out:
+            samefile = True
+            tmpfile = TempFile(self.file_in)
+            self.file_in = open(tmpfile.filepath)
         cycle = self.make_iter_blocks(self.num_block,
                                       self.time_block,
                                       self.text_block)
         new_lines = self.parse(self.file_in, cycle)
-        if self.file_in is self.file_out:
-            self.file_out.seek(0)
-            self.file_out.truncate()
         self.file_out.writelines(new_lines)
+        if samefile:
+            self.file_out.truncate()
         if self.IS_BLOCK and self.IS_WARN:
             warnings.warn("Incomplete block at EOF", IncompleteBlockError)
 
