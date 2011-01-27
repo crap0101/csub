@@ -181,10 +181,18 @@ class Subtitle (object):
         self.delta_ms = self.delta_sub_num = 0
         self.IS_BLOCK = True
         self.IS_WARN = False
+        self.IN_RANGE = True
+        self.check_range_to_edit = self.edit_range()
         self.actual_numline = 0
-        self.start_sub_num = None
-        self.end_sub_num = None
 
+    @staticmethod
+    def edit_range(start=None, stop=None):
+        start = 1 if start is None else start
+        stop = float('+inf') if stop is None else stop
+        def is_edit(number):
+            return number >= start and number < stop
+        return is_edit
+    
     def set_delta (self, hour, min_, sec, ms, sub_number):
         """Set time's attribute. """
         self.delta_hour = hour
@@ -192,6 +200,10 @@ class Subtitle (object):
         self.delta_sec = sec
         self.delta_ms = ms
         self.delta_sub_num = sub_number
+
+    def set_subs_range(self, start=None, end=None):
+        """Set blocks' range to edit, from `start' to `end' (excluded)."""
+        self.check_range_to_edit = self.edit_range(start, end)
 
     def make_iter_blocks (self, *methods):
         """Returns an itertools.cycle object for *methods. """
@@ -212,8 +224,17 @@ class Subtitle (object):
         """
         matched = re.match(self.RE_MATCH_NUMBER, num_str.rstrip())
         if matched is not None:
-            return int(matched.group(0)) + self.delta_sub_num
-        raise IndexNumError(num_str)
+            sub_num = int(matched.group(0))
+            if self.check_range_to_edit(sub_num):
+                self.IN_RANGE = True
+                return sub_num + self.delta_sub_num
+            else:
+                self.IN_RANGE = False
+                return sub_num
+        if not self.unsafe_number_mode:
+            raise IndexNumError(num_str)
+        else:
+            return int(num_str)
 
     def new_time_tuple (self, hour, min_, sec, ms):
         """Returns a tuple of (seconds, ms)
@@ -231,8 +252,7 @@ class Subtitle (object):
     def parse (self, lines, itertools_cycle_iterator):
         """Iterate over subtitle's ``lines''"""
         get_func = GetFunc(itertools_cycle_iterator)
-        for line, n in zip(lines, itertools.count(1)):
-            self.actual_numline = n
+        for line, self.actual_numline in zip(lines, itertools.count(1)):
             yield "%s\n" % get_func(line)
 
     def times_from_secs (self, total_sec):
@@ -248,12 +268,13 @@ class SrtSub (Subtitle):
     `file_in' and `file_out' must be file-like objects.
     """
 
-    def __init__ (self, file_in, file_out, unsafe_mode=False):
+    def __init__ (self, file_in, file_out, unsafe_time_mode=False, unsafe_number_mode=False):
         self.time_sep = " --> "
         self.string_format = "%02d:%02d:%02d,%03d"
         reg_safe = r'^(-{0,1}\d{2,}):(\d{2}):(\d{2}),(\d{3})$'
         reg_unsafe = r'^(-{0,1}\d{1,}):(\d{2}):(\d{2}),(\d{3})$'
-        self.re_pattern = reg_unsafe if unsafe_mode else reg_safe
+        self.re_pattern = reg_unsafe if unsafe_time_mode else reg_safe
+        self.unsafe_number_mode = unsafe_number_mode
         super(SrtSub, self).__init__(self.string_format, self.re_pattern)
         self.file_in = file_in
         self.file_out = file_out
@@ -267,6 +288,8 @@ class SrtSub (Subtitle):
     @iterdec()
     def time_block (self, time_string):
         """Check the time lines. """
+        if not self.IN_RANGE:
+            return time_string.rstrip()
         try:
             start, end = map(str.strip, time_string.split(self.time_sep))
         except ValueError:
@@ -337,9 +360,15 @@ if __name__ == '__main__':
     parser.add_option("-n", "--num", type="int", dest="num",
                       default=0, metavar="NUMBER",
                       help="change the progressive subtitle number by NUMBER.")
-    parser.add_option("-b", "--back-to-the-future", action="store_true", dest="unsafe_mode",
-                      default=False, help="unsafe mode. Don't get any errors if"
+    parser.add_option("-r", "--range", type="str",
+                      dest="range", default=':', metavar="START:END",
+                      help="apply changes only for subs between START and END (excluded).")
+    parser.add_option("-b", "--back-to-the-future", action="store_true", dest="unsafe_time_mode",
+                      default=False, help="unsafe time mode. Don't get any errors if"
                                           " timecode become negative.")
+    parser.add_option("-B", "--back-to-the-block", action="store_true", dest="unsafe_number_mode",
+                      default=False, help="unsafe number mode. Don't get any errors if"
+                                          " sub's numbers became negative.")
     parser.add_option("-w", "--warn", action="store_true", dest="is_warn",
                       default=False, help="enable warnings.")
 
@@ -357,8 +386,11 @@ if __name__ == '__main__':
             in_file = open(opts.infile, "r")
         if opts.outfile:
             out_file = open(opts.outfile, "w")
-    newsub = SrtSub(in_file, out_file, opts.unsafe_mode)
+    newsub = SrtSub(in_file, out_file, opts.unsafe_time_mode, opts.unsafe_number_mode)
     newsub.set_delta(opts.hour, opts.min, opts.sec, opts.ms, opts.num)
+    start_sub, end_sub = opts.range.split(':')
+    newsub.set_subs_range(int(start_sub) if start_sub else None,
+                          int(end_sub) if end_sub else None)
     newsub.IS_WARN = opts.is_warn
     try:
         newsub.main()
