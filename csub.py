@@ -86,15 +86,15 @@ def TempFileManager (methods):
 @TempFileManager(('close', 'read', 'seek', 'write_back'))
 class TempFile (object):
     """Class to manage temp file (using tmpfile's mkstemp). """
-    def __init__ (self, file_stream, options=None):
+    def __init__ (self, in_file, options=None):
         self.opts = {'suffix': '.csub-backup',
                 'prefix': 'subtitle_',
                 'text': True,}
         self.opts.update(options or {})
-        self.input_file_stream = file_stream
+        self.in_file = in_file
         self.fd, self.filepath = mkstemp(**self.opts)
-        self.fd_max_pos = os.write(self.fd, self.input_file_stream.read())
-        self.input_file_stream.seek(0)
+        with open(self.in_file) as _in:
+            self.fd_max_pos = os.write(self.fd, _in.read())
         self.seek(0, 0)
 
     def close (self):
@@ -107,10 +107,9 @@ class TempFile (object):
         return os.lseek(self.fd, pos, how)
 
     def write_back (self):
-        self.input_file_stream.seek(0)
-        self.seek(0, 0)
-        self.input_file_stream.write(self.read())
-        self.input_file_stream.truncate()
+        with open(self.in_file, 'w') as _in:
+            _in.write(self.read())
+            _in.truncate()
 
 
 class BadFormatError (Exception):
@@ -312,18 +311,11 @@ class SrtSub (Subtitle):
 
     def main (self):
         """Doing the job. """
-        samefile = False
-        if self.file_in is self.file_out:
-            samefile = True
-            tmpfile = TempFile(self.file_in)
-            self.file_in = open(tmpfile.filepath)
         cycle = self.make_iter_blocks(self.num_block,
                                       self.time_block,
                                       self.text_block)
         new_lines = self.parse(self.file_in, cycle)
         self.file_out.writelines(new_lines)
-        if samefile:
-            self.file_out.truncate()
         if self.IS_BLOCK and self.IS_WARN:
             warnings.warn("Incomplete block at EOF", IncompleteBlockError)
 
@@ -335,6 +327,7 @@ class SrtSub (Subtitle):
 if __name__ == '__main__':
     in_file = sys.stdin 
     out_file = sys.stdout
+    samefile = False
     tmpfile = TempFile(None)
 
     parser = OptionParser(version="csub %s" % VERSION)
@@ -382,8 +375,9 @@ if __name__ == '__main__':
     if args:
          parser.error("Error: unknown argument(s) %s" % args)
     if opts.infile == opts.outfile and all((opts.infile, opts.outfile)):
-        in_file = out_file = open(opts.infile, "r+")
-        tmpfile = TempFile(in_file)
+        tmpfile = TempFile(opts.infile)
+        in_file = open(tmpfile.filepath)
+        out_file = open(opts.infile, 'w')
     else:
         if opts.infile:
             in_file = open(opts.infile, "r")
@@ -400,8 +394,12 @@ if __name__ == '__main__':
     except (MismatchTimeError, IndexNumError), e:
         sys.stderr.write("[at line %d] %s: %s\n"
              % (newsub.actual_numline, e.__class__.__name__, e))
+        in_file.close()
+        out_file.close()
         tmpfile.write_back()
     except Exception, e:
+        in_file.close()
+        out_file.close()
         tmpfile.write_back()
         ue_msg = "\nUnknow error! maybe a bug. Shit!\nException is"
         sys.stderr.write("%s: %s\n\n" % (ue_msg, repr(e)))

@@ -20,36 +20,37 @@ import subprocess as sbp
 
 
 PROGFILE = 'csub.py'
+DATA_DIR = 'data'
 
 
 FAKESUB_0 = """1567
 01:26:32,200 --> 01:26:35,060
-"un figlio di puttana faceva ruotare la freccetta
+un figlio di puttana faceva ruotare la freccetta
 e mi prendeva a calci in culo, Eddie.
 
 1568
 01:26:35,830 --> 01:26:38,430
-"Poi dovevo andare a scuola e vedere
+Poi dovevo andare a scuola e vedere
 gli altri bambini mangiare cibo vero.
 
 1569
 01:26:38,500 --> 01:26:41,310
-"Dovevo vederli mangiare burro d'arachidi
+Dovevo vederli mangiare burro d'arachidi
 gelatina, carne, pasta,
 
 1570
 01:26:41,380 --> 01:26:44,140
-"prosciutto e formaggio.
+prosciutto e formaggio.
 Io avevo un dannato sandwich di Pongo.
 
 1571
 01:26:45,730 --> 01:26:48,050
-"Poi, per dessert, tiravano fuori
+Poi, per dessert, tiravano fuori
 una merendina
 
 1572
 01:26:48,190 --> 01:26:50,180
-"Ed io dovevo mangiarmi una dannata Slinky?
+Ed io dovevo mangiarmi una dannata Slinky?
 """
 
 FAKESUB_1 = """242
@@ -202,7 +203,7 @@ Esatto.
 
 FAKESUB_0_FAIL_TIME_IF_NOT_B = """1567
 -1:26:32,200 --> -1:26:35,060
-"un figlio di puttana faceva ruotare la freccetta
+un figlio di puttana faceva ruotare la freccetta
 e mi prendeva a calci in culo, Eddie.
 """
 
@@ -394,12 +395,16 @@ class TimeTransformTest (unittest.TestCase):
 class TempFileTest (unittest.TestCase):
 
     def testTempFileObjects (self):
+        CWD = op.dirname(op.realpath(__file__))
         tmp_1 = csub.TempFile(None)
         tmp_2 = csub.TempFile(sys.stdin)
-        tmp_3 = csub.TempFile(StringIO.StringIO(FAKESUB_0))
+        tmp_others = [csub.TempFile(f)
+                      for f in glob.glob(op.join(CWD, DATA_DIR, '*.srt'))]
         self.assertTrue(hasattr(tmp_1, '_fake'))
         self.assertTrue(hasattr(tmp_2, '_fake'))
-        self.assertFalse(hasattr(tmp_3, '_fake'))
+        for tmpf in tmp_others:
+            self.assertFalse(hasattr(tmpf, '_fake'))
+        tmp_3 = tmp_others[0]
         for method in ('close', 'read', 'seek', 'write_back'):
             m1 = inspect.getsourcelines(getattr(tmp_1, method))
             m2 = inspect.getsourcelines(getattr(tmp_2, method))
@@ -410,24 +415,29 @@ class TempFileTest (unittest.TestCase):
             self.assertNotEqual(m2, m3, "Are the same method!")
 
     def testTempSafety (self):
-        orig = StringIO.StringIO(FAKESUB_0_FAIL_TIME_IF_NOT_B)
-        sub = StringIO.StringIO(FAKESUB_0_FAIL_TIME_IF_NOT_B)
-        tmpfile = csub.TempFile(sub)
-        newsub = csub.SrtSub(sub, copy.deepcopy(sub))
-        self.assertRaises(csub.MismatchTimeError, newsub.main)
+        # input and output in the same file:
+        CWD = op.dirname(op.realpath(__file__))
+        testsub = op.join(CWD, DATA_DIR, 'fail_sub_1.srt')
+        with open(testsub) as ts:
+            string_sub = ts.read()
+        tmpfile = csub.TempFile(testsub)
+        with open(tmpfile.filepath) as in_file:
+            with open(testsub, 'w') as out_file:
+                newsub = csub.SrtSub(in_file, out_file)
+                self.assertRaises(csub.MismatchTimeError, newsub.main)
         tmpfile.write_back()
-        orig.seek(0)
-        sub.seek(0)
-        self.assertEqual(orig.read(), sub.read(), "sub file should be untouched!")
+        with open(testsub) as ts:
+            self.assertEqual(ts.read(), string_sub,
+                             "sub file shouldn't be modified!")
         # unsafe mode, no error should be raised:
-        orig = StringIO.StringIO(FAKESUB_0_FAIL_TIME_IF_NOT_B)
-        sub = StringIO.StringIO(FAKESUB_0_FAIL_TIME_IF_NOT_B)
-        tmpfile = csub.TempFile(sub)
-        newsub = csub.SrtSub(sub, sub, True)
+        with open(testsub) as ts:
+            outfile = csub.TempFile(testsub)
+            with open(outfile.filepath, 'w') as out:
+                newsub = csub.SrtSub(ts, out, True)
+                newsub.main()
 
 
 if __name__ == '__main__':
-    
     progdir = op.split(op.dirname(op.realpath(__file__)))[0]
     sys.path.insert(0, progdir)
     import csub
