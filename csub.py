@@ -488,16 +488,14 @@ if __name__ == '__main__':
                               int(end_sub) if end_sub else None)
     newsub.set_delta(opts.hour, opts.min, opts.sec, opts.ms, opts.num)
     newsub.IS_WARN = opts.is_warn
-    ass_opt_warn = 'WARNING: ignoring %s options with ass/ssa subtitles\n'
-    if opts.is_warn and opts.subtitle_type in ('ass', 'ssa'):
+    ass_opt_warn = 'options %s not available with ass/ssa subtitles\n'
+    if opts.subtitle_type in ('ass', 'ssa'):
         if opts.range != ':':
-            sys.stderr.write(ass_opt_warn % '-r/--range')
+            parser.error(ass_opt_warn % '-r/--range')
         if opts.num:
-            sys.stderr.write(ass_opt_warn % '-n/--num')
-        #if opts.unsafe_time_mode:
-        #    sys.stderr.write(ass_opt_warn % '-b/--back-to-the-future')
+            parser.error(ass_opt_warn % '-n/--num')
         if opts.unsafe_number_mode:
-            sys.stderr.write(ass_opt_warn % '-B/--back-to-the-block')
+            parser.error(ass_opt_warn % '-B/--back-to-the-block')
     try:
         newsub.main()
     except (BadFormatError, MismatchTimeError, IndexNumError), e:
