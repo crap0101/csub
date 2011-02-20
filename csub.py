@@ -24,8 +24,10 @@ Changelog (2010-07-11):
       accidental deletion of the source sub when the input file
       and the output file are the same.
 Examples:
-  ~$ ./prog_name --minutes 3 --seconds -44 --milliseconds -378 -num 2
-  ~$ ./prog_name -M -1 -S 4 -i film_sub.srt -o newfile.srt
+  # reading from stdin and output to stdout ans ass/ssa sub:
+  ~$ ./prog_name --minutes 3 --seconds -44 --milliseconds -378 -num 2 -t ass
+  # read a srt file from 'file_sub.srt' to 'newfile.srt':
+  ~$ ./prog_name -t srt -M -1 -S 4 -i film_sub.srt -o newfile.srt
 """ % VERSION
 
 #################
