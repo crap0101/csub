@@ -17,13 +17,16 @@ import inspect
 import unittest
 import StringIO
 import subprocess as sbp
+import shlex
+import operator
 
 
 PROGFILE = 'csub.py'
 DATA_DIR = 'data'
+CWD = op.dirname(op.realpath(__file__))
 
 
-FAKESUB_0 = """1567
+SRT_FAKESUB_0 = """1567
 01:26:32,200 --> 01:26:35,060
 un figlio di puttana faceva ruotare la freccetta
 e mi prendeva a calci in culo, Eddie.
@@ -53,7 +56,7 @@ una merendina
 Ed io dovevo mangiarmi una dannata Slinky?
 """
 
-FAKESUB_1 = """242
+SRT_FAKESUB_1 = """242
 00:12:34,439 --> 00:12:38,565
 Beh, prima di tutto il Nuovo Testamento venne
 dopo l'Antico Testamento, siamo d'accordo?
@@ -86,7 +89,7 @@ Sta dicendo che la Bibbia
 e' un documento fittizio?
 """
 
-FAKESUB_2 = """7
+SRT_FAKESUB_2 = """7
 00:17:11,480 --> 00:17:13,640
 I'm pit boss here on Level 2.
 
@@ -110,7 +113,7 @@ Please let me explain
 My crimes were merely boyish pranks
 """
 
-FAKESUB_3_FAIL_TIME = """170
+SRT_FAKESUB_3_FAIL_TIME = """170
 00:11:21,220 --> 00:11:23,897
 Sono perfettamente a mio agio
 con i fluidi corporei...
@@ -120,7 +123,7 @@ con i fluidi corporei...
 sangue, muco, lacrime...
 """
 
-FAKESUB_4_FAIL_TIME = """172
+SRT_FAKESUB_4_FAIL_TIME = """172
 00:11:26,316 --> 00:11:28,965
 ma con le emozioni che
 li accompagnano...
@@ -132,7 +135,7 @@ non ci so fare altrettanto bene.
 Dexter...
 """
 
-FAKESUB_5_FAIL_TIME = """182
+SRT_FAKESUB_5_FAIL_TIME = """182
 00:11:57,011 --> 00:12:00,414
 E' sempre perso nei suoi pensieri,
 e, quando mi parla, dice solo bugie.
@@ -148,7 +151,7 @@ e, quando mi parla, dice solo bugie.
 sempre sempre.
 """
 
-FAKESUB_6_FAIL_TIME = """172
+SRT_FAKESUB_6_FAIL_TIME = """172
 00:11:26,316 --> 00:11:28,965
 ma con le emozioni che
 li accompagnano...
@@ -160,7 +163,7 @@ non ci so fare altrettanto bene.
 Dexter...
 """
 
-FAKESUB_6_FAIL_INDEX = """182
+SRT_FAKESUB_6_FAIL_INDEX = """182
 00:11:57,011 --> 00:12:00,414
 E' sempre perso nei suoi pensieri,
 e, quando mi parla, dice solo bugie.
@@ -170,7 +173,7 @@ error here!
 00:12:00,449 --> 00:12:01,997
 """
 
-FAKESUB_7_FAIL_INDEX = """182
+SRT_FAKESUB_7_FAIL_INDEX = """182
 00:11:57,011 --> 00:12:00,414
 E' sempre perso nei suoi pensieri,
 e, quando mi parla, dice solo bugie.
@@ -181,7 +184,7 @@ e, quando mi parla, dice solo bugie.
 00:12:00,449 --> 00:12:01,997
 """
 
-FAKESUB_8_FAIL_INDEX = """182
+SRT_FAKESUB_8_FAIL_INDEX = """182
 00:11:57,011 --> 00:12:00,414
 E' sempre perso nei suoi pensieri,
 e, quando mi parla, dice solo bugie.
@@ -192,7 +195,7 @@ e, quando mi parla, dice solo bugie.
 00:12:00,449 --> 00:12:01,997
 """
 
-FAKESUB_9_FAIL_INDEX = """249
+SRT_FAKESUB_9_FAIL_INDEX = """249
 00:12:51,650 --> 00:12:52,735
 Esatto.
 
@@ -201,20 +204,83 @@ Esatto.
 - Si' invece.
 """
 
-FAKESUB_0_FAIL_TIME_IF_NOT_B = """1567
+SRT_FAKESUB_0_FAIL_TIME_IF_NOT_B = """1567
 -1:26:32,200 --> -1:26:35,060
 un figlio di puttana faceva ruotare la freccetta
 e mi prendeva a calci in culo, Eddie.
 """
 
-class FileTest (unittest.TestCase):
+ASS_FAKESUB_0 = '''Dialogue: 0,0:01:02.25,0:01:04.75,Default,,0000,0000,0000,,Che bello vedervi, è una figata!
+Dialogue: 0,0:01:04.85,0:01:06.77,Default,,0000,0000,0000,,Vi divertirete stasera, è un bello spettacolo.
+Dialogue: 0,0:01:06.80,0:01:10.17,Default,,0000,0000,0000,,È sempre stato bello, se stasera farà schifo potrebbe essere colpa vostra.
+'''
+
+ASS_FAKESUB_1 = """Dialogue: 0,0:03:43.14,0:03:44.82,Default,,0000,0000,0000,,Fottuti... vedete...
+Dialogue: 0,0:03:44.93,0:03:48.86,Default,,0000,0000,0000,,...il rock cristiano è una tale fottuta assurdità, in questo mondo...
+Dialogue: 0,0:03:58:08,0:03:59.90,Default,,0000,0000,0000,,"È il mio Salvatore..."
+Dialogue: 0,0:04:06:72,0:04:09.02,Default,,0000,0000,0000,,Questo non è rock'n'roll!
+Dialogue: 0,0:04:09.27,0:04:12:84,Default,,0000,0000,0000,,È merda degna di un club giovanile di ping pong!
+Dialogue: 0,0:04:13.61,0:04:17:69,Default,,0000,0000,0000,,Il rock'n'roll è: "Sono il diavolo e voglio scoparmi tua madre!"
+Dialogue: 0,0:04:28.94,0:04:32.87,Default,,0000,0000,0000,,Ho sempre voluto cantare una di quelle canzoni di Elvis che si fermavano.
+Dialogue: 0,0:04:33:33,0:04:34:87,Default,,0000,0000,0000,,Il vero Elvis.
+Dialogue: 0,0:04:35.09,0:04:38.08,Default,,0000,0000,0000,,Non quello stronzo grasso che l'ha preso in ostaggio e l'ha mangiato.
+"""
+
+ASS_FAKESUB_2_OK_MISC = """
+Dialogue: 0,0:08:47.19,0:08:50.97,Default,,0000,0000,0000,,Sapete, per quelli di voi che se la prendono per una cazzo di battuta.
+Dialogue: 0,0:09:19.61,0:09:22.99,Default,,0000,0000,0000,,Detto questo, per me la religione è finita, cazzo!
+Dialogue: 0,0:09:02.35,0:09:05.32,Default,,0000,0000,0000,,Basta, è fottutamente finita, amici,
+Dialogue: 0,1:09:05.55,1:09:08.22,Default,,0000,0000,0000,,è finita, cazzo!
+Dialogue: 0,0:09:08.39,0:09:12.96,Default,,0000,0000,0000,,Avete avuto un paio di migliaia di anni, avete mandato tutto a puttane, è finita!
+Dialogue: 0,1:09:48.72,1:09:51.56,Default,,0000,0000,0000,,È fottutamente FINITA!
+Dialogue: 0,0:09:16.92,0:09:19.54,Default,,0000,0000,0000,,Prendete la vostra Riforma, il vostro Vaticano,
+Dialogue: 0,0:08:58.88,0:09:01.83,Default,,0000,0000,0000,,la vostra fottuta Mecca e andatevene affanculo!
+Dialogue: 0,0:09:30.17,0:09:34.80,Default,,0000,0000,0000,,Kamikaze, cazzo! Ecco un'ottima idea.
+Dialogue: 0,0:09:36.15,0:09:39.50,Default,,0000,0000,0000,,A ogni esplosione c'è un segaiolo in meno.
+Dialogue: 0,0:09:42.27,0:09:44.04,Default,,0000,0000,0000,,Fottuti idioti!
+Dialogue: 0,0:09:45.12,0:09:47.32,Default,,0000,0000,0000,,Voglio vedere l'istruttore!
+Dialogue: 0,0:09:13.12,0:09:16.41,Default,,0000,0000,0000,,"Ok, ragazzi, ve lo mostrerò una volta sola..."
+Dialogue: 0,0:09:57.43,0:09:59.06,Default,,0000,0000,0000,,Fottuti cazzoni!
+"""
+
+ASS_FAKESUB_3_FAIL_TIME = """
+Dialogue: 0,0:06:54.55,0:06:57.83,Default,,0000,0000,0000,,Avete visto il funerale del Papa? Un funerale tranquillo, lo voleva semplice.
+Dialogue: 0,0:06:59.64,0:07:01.52,Default,,0000,0000,0000,,Cazzo, era tipo "Ben Hur", vero?
+Dialogue: 0,0:07:04.73,0:07:07.09,Default,,0000,0000,0000,,Migliaia di pedofili in velluto rosso.
+Dialogue: 0,0:07:20.02,0:07:21.81,Default,,0000,0000,0000,,In realtà era morto da un po'.
+Dialogue: 0,0:07:22.49,0:07:23.81,Default,,0000,0000,0000,,4 o 5 anni.
+Dialogue: 0,0:07:26.03,0:07:27.86,Default,,0000,0000,0000,,Ma non avevano scelto quello che volevano,
+Dialogue: 0,0:07:27.93,0:07:30.136,Default,,0000,0000,0000,,il piccolo fascista fottuto, quindi...
+"""
+
+ASS_FAKESUB_4_FAIL_TIME_H = """
+Dialogue: 0,0:07:31.07,0:07:33.38,Default,,0000,0000,0000,,Il piccolo Benedetto della fottuta Hitler Jugend.
+Dialogue: 0,11:07:35.58,0:07:38.18,Default,,0000,0000,0000,,Stavano aspettando che il suo nome salisse in cima alla lista.
+"""
+
+ASS_FAKESUB_5_FAIL_TIME_H = """
+Dialogue: 0,0:07:38.35,0:07:41.00,Default,,0000,0000,0000,,Quindi lo hanno trascinato in giro su quella sedia per un paio d'anni.
+Dialogue: 0,0:07:43.13,11:07:45.19,Default,,0000,0000,0000,,Lo hanno impagliato con i giornali della domenica...
+Dialogue: 0,0:07:46.49,0:07:48.92,Default,,0000,0000,0000,,...due gesuiti dietro di lui gli muovevano la testa...
+Dialogue: 0,0:08:08.73,0:08:12.03,Default,,0000,0000,0000,,Oh, dovete tenerli d'occhio, quei fottuti.
+"""
+
+ASS_FAKESUB_6_FILE_TIME_IF_NOT_B = """
+Dialogue: 0,0:08:35.74,0:08:40.15,Default,,0000,0000,0000,,Nessun bambino è stato molestato nella produzione di questo spettacolo!
+Dialogue: 0,0:08:41.95,-1:08:43.35,Default,,0000,0000,0000,,Nessuno è stato ferito.
+Dialogue: 0,0:08:43.44,0:08:46.27,Default,,0000,0000,0000,,E non sono state usate vignette islamiche!
+"""
+
+
+
+class SrtFileTest (unittest.TestCase):
     """Test operation on files. """
 
-    def testOkSubs (self):
+    def testOkSrtSubs (self):
         options = ["-H", "-M", "-S", "-m", "-n"]
         lenopt = len(options)
         cmdline = ["python", PROGFILE]
-        for sub in (FAKESUB_0, FAKESUB_1, FAKESUB_2):
+        for sub in (SRT_FAKESUB_0, SRT_FAKESUB_1, SRT_FAKESUB_2):
             choosed = cmdline[:]
             back_to = cmdline[:]
             opts = options[:]
@@ -223,11 +289,15 @@ class FileTest (unittest.TestCase):
                 o, v = opts.pop(), random.randint(0, 999)
                 back_to.append("%s %d" % (o, -v))
                 choosed.append("%s %d" % (o, v))
+
+            cmdline.append('%s srt' %
+                           ('-t' if random.randint(0,1) else '--type'))
+            cmdline = shlex.split(' '.join(cmdline))
             fpipe = sbp.Popen(["echo", "-n", sub], stdout=sbp.PIPE)
             spipe = sbp.Popen(cmdline, stdin=fpipe.stdout, stdout=sbp.PIPE)
             new_text = spipe.communicate()[0]
             retcode = spipe.returncode
-            self.assertEqual(retcode, 0, "Retcode is %d" % retcode)
+            self.assertEqual(retcode, 0, "Retcode is %d %s %s" % (retcode, cmdline, sub))
             fpipe = sbp.Popen(["echo", "-n", new_text], stdout=sbp.PIPE)
             spipe = sbp.Popen(cmdline, stdin=fpipe.stdout, stdout=sbp.PIPE)
             orig_text = spipe.communicate()[0]
@@ -236,24 +306,28 @@ class FileTest (unittest.TestCase):
             self.assertEqual(sub, orig_text, "Differences between texts!!!\n"
                              "#%s######\n#%s###" % (sub, orig_text))
 
-    def testFailSubs (self):
-        fail_list = [FAKESUB_6_FAIL_INDEX, FAKESUB_7_FAIL_INDEX,
-                     FAKESUB_8_FAIL_INDEX,FAKESUB_9_FAIL_INDEX, 
-                     FAKESUB_3_FAIL_TIME, FAKESUB_4_FAIL_TIME, 
-                     FAKESUB_5_FAIL_TIME, FAKESUB_6_FAIL_TIME,]
+    def testFailSrtSubs (self):
+        fail_list = [SRT_FAKESUB_6_FAIL_INDEX, SRT_FAKESUB_7_FAIL_INDEX,
+                     SRT_FAKESUB_8_FAIL_INDEX,SRT_FAKESUB_9_FAIL_INDEX, 
+                     SRT_FAKESUB_3_FAIL_TIME, SRT_FAKESUB_4_FAIL_TIME, 
+                     SRT_FAKESUB_5_FAIL_TIME, SRT_FAKESUB_6_FAIL_TIME,]
+        cmdline = ["python", PROGFILE]
+        cmdline.append('%s srt' %
+                       ('-t' if random.randint(0,1) else '--type'))
+        cmdline = shlex.split(' '.join(cmdline))
         for sub in fail_list:
             fpipe = sbp.Popen(["echo", "-n"], stdout=sbp.PIPE)
-            spipe = sbp.Popen(["python", PROGFILE],
+            spipe = sbp.Popen(cmdline,
                               stdin=fpipe.stdout, stdout=sbp.PIPE)
             out = spipe.communicate()[0]
             retcode = spipe.returncode
             self.assertEqual(retcode, 0, (retcode))
 
-    def testIndex (self):
-        for sub_string in (FAKESUB_6_FAIL_INDEX,
-                           FAKESUB_7_FAIL_INDEX,
-                           FAKESUB_8_FAIL_INDEX, 
-                           FAKESUB_9_FAIL_INDEX,):
+    def testSrtIndex (self):
+        for sub_string in (SRT_FAKESUB_6_FAIL_INDEX,
+                           SRT_FAKESUB_7_FAIL_INDEX,
+                           SRT_FAKESUB_8_FAIL_INDEX, 
+                           SRT_FAKESUB_9_FAIL_INDEX,):
             sub = StringIO.StringIO(sub_string)
             newsub = csub.SrtSub(sub, copy.deepcopy(sub))
             self.assertRaises(csub.IndexNumError, newsub.main)
@@ -266,7 +340,7 @@ class FileTest (unittest.TestCase):
         errors = [TypeError, UnboundLocalError, ValueError,
                   IOError, OSError, SystemError, AttributeError,]
         for error in errors:
-            sub = StringIO.StringIO(FAKESUB_0)
+            sub = StringIO.StringIO(SRT_FAKESUB_0)
             newsub = csub.SrtSub(sub, sub)
             newsub.match_time = get_error(error)
             try:
@@ -277,7 +351,7 @@ class FileTest (unittest.TestCase):
                 self.assertNotEqual(e, csub.IndexNumError, msg)
 
 
-class ReTest (unittest.TestCase):
+class SrtReTest (unittest.TestCase):
 
     def setUp (self):
         self.subs = csub.SrtSub(None, None)
@@ -300,7 +374,7 @@ class ReTest (unittest.TestCase):
         self.number_string_err =("+097a", "07a",  "0xffffffff", "+", "-",
                                   "-2e10",  "2e10", "stringa",)
 
-    def testReTime (self):
+    def testSrtReTime (self):
         self.unsafe_subs = csub.SrtSub(None, None, True) # for testing unsafe mode
         for string in self.time_string_ok:
             self.assertTrue(self.subs.match_time(string),
@@ -314,7 +388,7 @@ class ReTest (unittest.TestCase):
                               self.subs.match_time, string)
         
 
-    def testReNumber (self):
+    def testSrtReNumber (self):
         for string in self.number_string_ok:
             self.assertTrue((self.subs.new_sub_num(string) is not None),
                             "Failed on %s" % string)
@@ -323,7 +397,7 @@ class ReTest (unittest.TestCase):
                               self.subs.new_sub_num, string)
 
 
-class TimeTransformTest (unittest.TestCase):
+class SrtTimeTransformTest (unittest.TestCase):
 
     def setUp (self):
         self.subs = csub.SrtSub(None, None)
@@ -373,13 +447,13 @@ class TimeTransformTest (unittest.TestCase):
         self.subs.set_delta(*map(int.__neg__, delta_time))
         return self.subs.time_block(new_time_string)[0]
 
-    def testTimeSep (self):
+    def testSrtTimeSep (self):
         for string in self.sep_err:
             self.assertRaises(csub.MismatchTimeError,
                               self.subs.time_block, string)
 
     def testTimeCalc (self):
-        self.subs.set_delta(0, 0, 0, 0, 0)
+        self.subs = csub.SrtSub(None, None, True)
         for tlines in self.time_lines:
             self.assertEqual(tlines, self.subs.time_block(tlines)[0],
                              "wrong time update in %s" % repr(tlines))
@@ -395,7 +469,6 @@ class TimeTransformTest (unittest.TestCase):
 class TempFileTest (unittest.TestCase):
 
     def testTempFileObjects (self):
-        CWD = op.dirname(op.realpath(__file__))
         tmp_1 = csub.TempFile(None)
         tmp_2 = csub.TempFile(sys.stdin)
         tmp_others = [csub.TempFile(f)
@@ -437,19 +510,114 @@ class TempFileTest (unittest.TestCase):
                 newsub.main()
 
 
+class AssFileTest (unittest.TestCase):
+    def testAssTimeTransform (self):
+        subtitles = (ASS_FAKESUB_1,ASS_FAKESUB_2_OK_MISC,)
+        _neg = operator.neg
+        _r = random.randint
+        for i in range(200):
+            for subtitle in subtitles:
+                sub_orig = StringIO.StringIO(subtitle)
+                sub_in = StringIO.StringIO(subtitle)
+                sub_out = StringIO.StringIO()
+                inst = csub.AssSub(sub_in, sub_out)
+                time_delta = [_r(1,3), _r(1,200), _r(1,200), _r(1,200)]
+                inst.set_delta(*time_delta)
+                inst.main()
+                sub_in.seek(0)
+                sub_out.seek(0)
+                self.assertNotEqual(sub_in.read(), sub_out.read())
+                sub_in.seek(0)
+                sub_out.seek(0)
+                sub_in.truncate(0)
+                inst = csub.AssSub(sub_out, sub_in)
+                inst.set_delta(*list(_neg(t) for t in time_delta))
+                inst.main()
+                sub_in.seek(0)
+                self.assertEqual(sub_in.read(), sub_orig.read())
+
+    def testAssSubsOk (self):
+        subtitles = (ASS_FAKESUB_1,ASS_FAKESUB_2_OK_MISC,)
+        _neg = operator.neg
+        _r = random.randint
+        for subfile in glob.glob(op.join(CWD, DATA_DIR, 'test*.ass')):
+            with open(subfile, 'r+b') as infile:
+                outfile = StringIO.StringIO()
+                inst = csub.AssSub(infile, outfile)
+                inst.main()
+                infile.seek(0)
+                outfile.seek(0)
+                self.assertEqual(infile.read(), outfile.read())
+        for i in range(200):
+            for subtitle in subtitles:
+                sub_orig = StringIO.StringIO(subtitle)
+                sub_in = StringIO.StringIO(subtitle)
+                sub_out = StringIO.StringIO()
+                inst = csub.AssSub(sub_in, sub_out)
+                time_delta = [_r(11,13), _r(1,200), _r(1,200), _r(1,200)]
+                inst.set_delta(*time_delta)
+                inst.main()
+                # check back, fail without -b option:
+                sub_out.seek(0)
+                sub_in.seek(0)
+                sub_in.truncate()
+                inst = csub.AssSub(sub_out, sub_in)
+                inst.set_delta(*list(_neg(t) for t in time_delta))
+                self.assertRaises(csub.MismatchTimeError, inst.main)
+                # no fail:
+                sub_out.seek(0)
+                sub_in.seek(0)
+                sub_in.truncate()
+                inst = csub.AssSub(sub_out, sub_in, True)
+                inst.set_delta(*list(_neg(t) for t in time_delta))
+                sub_in.seek(0)
+                inst.main()
+                sub_in.seek(0)
+                self.assertEqual(sub_in.read(), sub_orig.read())
+                
+    def testAssFail (self):
+        subtitles = (ASS_FAKESUB_3_FAIL_TIME,
+                     ASS_FAKESUB_4_FAIL_TIME_H,
+                     ASS_FAKESUB_5_FAIL_TIME_H,
+                     ASS_FAKESUB_6_FILE_TIME_IF_NOT_B,)
+        for subfile in glob.glob(op.join(CWD, DATA_DIR, 'fail*.ass')):
+            with open(subfile, 'r+b') as infile:
+                outfile = StringIO.StringIO()
+                inst = csub.AssSub(infile, outfile)
+                self.assertRaises(csub.MismatchTimeError, inst.main)
+        for subtitle in subtitles:
+                sub_in = StringIO.StringIO(subtitle)
+                sub_out = StringIO.StringIO()
+                inst = csub.AssSub(sub_in, sub_out)
+                inst.set_delta()
+                self.assertRaises(csub.MismatchTimeError, inst.main)
+        # no failure if -b option is enabled
+        nofail_sub = ASS_FAKESUB_6_FILE_TIME_IF_NOT_B
+        sub_in = StringIO.StringIO(nofail_sub)
+        sub_out = StringIO.StringIO()
+        inst = csub.AssSub(sub_in, sub_out, True)
+        inst.set_delta()
+        inst.main()
+        # and let's check if the output is the same...
+        sub_in.seek(0)
+        sub_out.seek(0)
+        self.assertEqual(sub_in.read(), sub_out.read())        
+
+
+def load_tests():
+    loader = unittest.TestLoader()
+    test_cases = (SrtFileTest, SrtReTest,
+                  SrtTimeTransformTest, TempFileTest,
+                  AssFileTest,)
+    return (loader.loadTestsFromTestCase(t) for t in test_cases)
+
+
 if __name__ == '__main__':
     progdir = op.split(op.dirname(op.realpath(__file__)))[0]
     sys.path.insert(0, progdir)
     import csub
     PROGFILE = op.join(op.split(op.dirname(op.realpath(__file__)))[0], 'csub.py')
-
-    file_suite = unittest.TestLoader().loadTestsFromTestCase(FileTest)
-    re_suite = unittest.TestLoader().loadTestsFromTestCase(ReTest)
-    time_suite = unittest.TestLoader().loadTestsFromTestCase(TimeTransformTest)
-    tmp_suite = unittest.TestLoader().loadTestsFromTestCase(TempFileTest)
-    tests = unittest.TestSuite([file_suite, re_suite, time_suite, tmp_suite])
-    unittest.TextTestRunner(verbosity=2).run(tests)
-
+    unittest.TextTestRunner(verbosity=2).run(unittest.TestSuite(load_tests()))
     for f in glob.glob("%s.py[oc]" % op.splitext(PROGFILE)[0]):
         os.remove(f) 
 
