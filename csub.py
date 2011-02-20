@@ -43,7 +43,7 @@ import itertools
 import warnings
 from tempfile import mkstemp
 from optparse import OptionParser, OptionValueError
-
+from string import Template
 
 #####################
 # F U N C T I O N S #
@@ -490,14 +490,14 @@ if __name__ == '__main__':
                               int(end_sub) if end_sub else None)
     newsub.set_delta(opts.hour, opts.min, opts.sec, opts.ms, opts.num)
     newsub.IS_WARN = opts.is_warn
-    ass_opt_warn = 'options %s not available with ass/ssa subtitles\n'
+    opt_err = Template('options $what not available with ass/ssa subtitles\n')
     if opts.subtitle_type in ('ass', 'ssa'):
         if opts.range != ':':
-            parser.error(ass_opt_warn % '-r/--range')
+            parser.error(opt_err.substitute(what='-r/--range'))
         if opts.num:
-            parser.error(ass_opt_warn % '-n/--num')
+            parser.error(opt_err.substitute(what='-n/--num'))
         if opts.unsafe_number_mode:
-            parser.error(ass_opt_warn % '-B/--back-to-the-block')
+            parser.error(opt_err.substitute(what='-B/--back-to-the-block'))
     try:
         newsub.main()
     except (BadFormatError, MismatchTimeError, IndexNumError), e:
