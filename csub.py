@@ -114,7 +114,7 @@ class TempFile (object):
         self.opts.update(options or {})
         self.in_file = in_file
         self.fd, self.filepath = mkstemp(**self.opts)
-        with open(self.in_file) as _in:
+        with open(self.in_file, 'rb') as _in:
             self.fd_max_pos = os.write(self.fd, _in.read())
         self.seek(0, 0)
 
@@ -128,7 +128,7 @@ class TempFile (object):
         return os.lseek(self.fd, pos, how)
 
     def write_back (self):
-        with open(self.in_file, 'w') as _in:
+        with open(self.in_file, 'wb') as _in:
             _in.write(self.read())
             _in.truncate()
 
@@ -470,13 +470,13 @@ if __name__ == '__main__':
          parser.error("Error: unknown argument(s) %s" % args)
     if opts.infile == opts.outfile and all((opts.infile, opts.outfile)):
         tmpfile = TempFile(opts.infile)
-        in_file = open(tmpfile.filepath)
-        out_file = open(opts.infile, 'w')
+        in_file = open(tmpfile.filepath, 'rb')
+        out_file = open(opts.infile, 'wb')
     else:
         if opts.infile:
-            in_file = open(opts.infile, "r")
+            in_file = open(opts.infile, "rb")
         if opts.outfile:
-            out_file = open(opts.outfile, "w")
+            out_file = open(opts.outfile, "wb")
     # temporary ugly if/elif:
     if not opts.subtitle_type:
         parser.error("subtitle type (-t/--type) must be specified!")

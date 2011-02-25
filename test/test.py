@@ -491,21 +491,21 @@ class TempFileTest (unittest.TestCase):
         # input and output in the same file:
         CWD = op.dirname(op.realpath(__file__))
         testsub = op.join(CWD, DATA_DIR, 'fail_sub_1.srt')
-        with open(testsub) as ts:
+        with open(testsub, 'rb') as ts:
             string_sub = ts.read()
         tmpfile = csub.TempFile(testsub)
-        with open(tmpfile.filepath) as in_file:
-            with open(testsub, 'w') as out_file:
+        with open(tmpfile.filepath, 'rb') as in_file:
+            with open(testsub, 'wb') as out_file:
                 newsub = csub.SrtSub(in_file, out_file)
                 self.assertRaises(csub.MismatchTimeError, newsub.main)
         tmpfile.write_back()
-        with open(testsub) as ts:
+        with open(testsub, 'rb') as ts:
             self.assertEqual(ts.read(), string_sub,
                              "sub file shouldn't be modified!")
         # unsafe mode, no error should be raised:
-        with open(testsub) as ts:
+        with open(testsub, 'rb') as ts:
             outfile = csub.TempFile(testsub)
-            with open(outfile.filepath, 'w') as out:
+            with open(outfile.filepath, 'wb') as out:
                 newsub = csub.SrtSub(ts, out, True)
                 newsub.main()
 
@@ -541,7 +541,7 @@ class AssFileTest (unittest.TestCase):
         _neg = operator.neg
         _r = random.randint
         for subfile in glob.glob(op.join(CWD, DATA_DIR, 'test*.ass')):
-            with open(subfile, 'r+b') as infile:
+            with open(subfile, 'rb') as infile:
                 outfile = StringIO.StringIO()
                 inst = csub.AssSub(infile, outfile)
                 inst.main()
@@ -581,7 +581,7 @@ class AssFileTest (unittest.TestCase):
                      ASS_FAKESUB_5_FAIL_TIME_H,
                      ASS_FAKESUB_6_FILE_TIME_IF_NOT_B,)
         for subfile in glob.glob(op.join(CWD, DATA_DIR, 'fail*.ass')):
-            with open(subfile, 'r+b') as infile:
+            with open(subfile, 'rb') as infile:
                 outfile = StringIO.StringIO()
                 inst = csub.AssSub(infile, outfile)
                 self.assertRaises(csub.MismatchTimeError, inst.main)
