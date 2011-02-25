@@ -1,9 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 VERSION = '1.0'
 
-"""csub %s - utility to synchronize subtitle files (actually: *.srt)
+"""csub {0} - utility to synchronize subtitle files (actually: *.srt)
 
 # Copyright (C) 2010  Marco Chieppa (aka crap0101)
 # This program is free software; you can redistribute it and/or modify
@@ -28,7 +28,7 @@ Examples:
   ~$ ./prog_name --minutes 3 --seconds -44 --milliseconds -378 -num 2 -t ass
   # read a srt file from 'file_sub.srt' to 'newfile.srt':
   ~$ ./prog_name -t srt -M -1 -S 4 -i film_sub.srt -o newfile.srt
-""" % VERSION
+""".format(VERSION)
 
 #################
 # I M P O R T S #
@@ -105,12 +105,12 @@ def TempFileManager (methods):
 #################
 
 @TempFileManager(('close', 'read', 'seek', 'write_back'))
-class TempFile (object):
+class TempFile:
     """Class to manage temp file (using tmpfile's mkstemp). """
     def __init__ (self, in_file, options=None):
         self.opts = {'suffix': '.csub-backup',
-                'prefix': 'subtitle_',
-                'text': True,}
+                     'prefix': 'subtitle_',
+                     'text': True,}
         self.opts.update(options or {})
         self.in_file = in_file
         self.fd, self.filepath = mkstemp(**self.opts)
@@ -171,21 +171,21 @@ class IncompleteBlockError (Warning):
         return self.message
     
 
-class GetFunc (object):
+class GetFunc:
     """ Help class to iterate over the line's check methods. """
 
     def __init__ (self, cycle):
         self.cycle = cycle
-        self.function = cycle.next()
+        self.function = next(cycle)
 
     def __call__ (self, *args, **kwords):
         res, change = self.function(*args, **kwords)
         if change:
-            self.function = self.cycle.next()
+            self.function = next(self.cycle)
         return res
 
 
-class Subtitle (object):
+class Subtitle:
     """Base class implementing common function for time manipulation
     and subtitles formatting.
     """
@@ -312,7 +312,7 @@ class AssSub (Subtitle):
         # milliseconds (to avoid rewrite methos in the base class).
         
     def new_time(self, time_string, sec_sep):
-        h, m, s, hndrs = map(int, self.time_reg.match(time_string).groups())
+        h, m, s, hndrs = list(map(int, self.time_reg.match(time_string).groups()))
         total_secs, hndrs = self.new_time_tuple(h, m, s, hndrs)
         h, m, s = self.times_from_secs(total_secs)
         return "%d:%02d:%02d%s%02d" % (h, m, s, sec_sep, hndrs) #numslice(hndrs, 2))
@@ -330,10 +330,10 @@ class AssSub (Subtitle):
                 new_start = self.new_time(start, start_sep)
                 new_end = self.new_time(end, end_sep)
                 return ','.join((init, new_start, new_end, rest))
-            except ValueError, err:
+            except ValueError as err:
                 raise MismatchTimeError("(%s) Something went wrong "
                                         "computing this line: %s" % (err, line))
-            except AttributeError, err:
+            except AttributeError as err:
                 raise MismatchTimeError("You probably need to "
                                         "--back-to-the-future\n"
                                         "ERR LINE IS: %s" % line)            
@@ -344,7 +344,7 @@ class AssSub (Subtitle):
         self.delta_ms = hndrs
     
     def main (self):
-        for self.actual_numline, line in itertools.izip(
+        for self.actual_numline, line in zip(
             itertools.count(1), self.file_in):
             self.file_out.write("%s\n" % self.parse_line(line))
 
@@ -376,15 +376,15 @@ class SrtSub (Subtitle):
         if not self.IN_RANGE:
             return time_string.rstrip()
         try:
-            start, end = map(str.strip, time_string.split(self.time_sep))
+            start, end = list(map(str.strip, time_string.split(self.time_sep)))
         except ValueError:
             raise MismatchTimeError("[at line %d] '%s' (in %s)"
                  % (self.actual_numline, time_string, "time_block"))
-        h, m, s, ms = map(int, self.match_time(start).group(1, 2, 3, 4))
+        h, m, s, ms = list(map(int, self.match_time(start).group(1, 2, 3, 4)))
         sec, ms = self.new_time_tuple(h, m, s, ms)
         nh, nm, ns = self.times_from_secs(sec)
         new_start = self.string_format % (nh, nm, ns, ms)
-        h, m, s, ms = map(int, self.match_time(end).group(1, 2, 3 , 4))
+        h, m, s, ms = list(map(int, self.match_time(end).group(1, 2, 3 , 4)))
         sec, ms = self.new_time_tuple(h, m, s, ms)
         nh, nm, ns = self.times_from_secs(sec)
         new_end = self.string_format % (nh, nm, ns, ms)
@@ -464,19 +464,19 @@ if __name__ == '__main__':
 
     opts, args = parser.parse_args()
     if opts.info:
-        print __doc__
+        print(__doc__)
         sys.exit(0)
     if args:
          parser.error("Error: unknown argument(s) %s" % args)
     if opts.infile == opts.outfile and all((opts.infile, opts.outfile)):
         tmpfile = TempFile(opts.infile)
-        in_file = open(tmpfile.filepath, 'rb')
-        out_file = open(opts.infile, 'wb')
+        in_file = open(tmpfile.filepath, 'r')
+        out_file = open(opts.infile, 'w')
     else:
         if opts.infile:
-            in_file = open(opts.infile, "rb")
+            in_file = open(opts.infile, "r")
         if opts.outfile:
-            out_file = open(opts.outfile, "wb")
+            out_file = open(opts.outfile, "w")
     # temporary ugly if/elif:
     if not opts.subtitle_type:
         parser.error("subtitle type (-t/--type) must be specified!")
@@ -500,13 +500,13 @@ if __name__ == '__main__':
             parser.error(opt_err.substitute(what='-B/--back-to-the-block'))
     try:
         newsub.main()
-    except (BadFormatError, MismatchTimeError, IndexNumError), e:
+    except (BadFormatError, MismatchTimeError, IndexNumError) as e:
         sys.stderr.write("%s: [at line %d] %s\n"
              % (e.__class__.__name__, newsub.actual_numline, str(e)))
         in_file.close()
         out_file.close()
         tmpfile.write_back()
-    except Exception, e:
+    except Exception as e:
         in_file.close()
         out_file.close()
         tmpfile.write_back()

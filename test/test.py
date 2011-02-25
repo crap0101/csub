@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 """
@@ -15,10 +15,11 @@ import copy
 import random
 import inspect
 import unittest
-import StringIO
+import io
 import subprocess as sbp
 import shlex
 import operator
+import platform
 
 
 PROGFILE = 'csub.py'
@@ -277,6 +278,8 @@ class SrtFileTest (unittest.TestCase):
     """Test operation on files. """
 
     def testOkSrtSubs (self):
+        if platform.system() == 'Windows':
+            self.skipTest('actually not available on Windows platform')
         options = ["-H", "-M", "-S", "-m", "-n"]
         lenopt = len(options)
         cmdline = ["python", PROGFILE]
@@ -303,10 +306,14 @@ class SrtFileTest (unittest.TestCase):
             orig_text = spipe.communicate()[0]
             retcode = spipe.returncode
             self.assertEqual(retcode, 0, "Retcode is %d" %retcode)
-            self.assertEqual(sub, orig_text, "Differences between texts!!!\n"
+            self.assertEqual(sub.encode(sys.stdout.encoding), orig_text,
+                             #bytes(sub,'utf-8'),bytes(orig_text),
+                             "Differences between texts!!!\n"
                              "#%s######\n#%s###" % (sub, orig_text))
 
     def testFailSrtSubs (self):
+        if platform.system() == 'Windows':
+            self.skipTest('actually not available on Windows platform')
         fail_list = [SRT_FAKESUB_6_FAIL_INDEX, SRT_FAKESUB_7_FAIL_INDEX,
                      SRT_FAKESUB_8_FAIL_INDEX,SRT_FAKESUB_9_FAIL_INDEX, 
                      SRT_FAKESUB_3_FAIL_TIME, SRT_FAKESUB_4_FAIL_TIME, 
@@ -328,7 +335,7 @@ class SrtFileTest (unittest.TestCase):
                            SRT_FAKESUB_7_FAIL_INDEX,
                            SRT_FAKESUB_8_FAIL_INDEX, 
                            SRT_FAKESUB_9_FAIL_INDEX,):
-            sub = StringIO.StringIO(sub_string)
+            sub = io.StringIO(sub_string)
             newsub = csub.SrtSub(sub, copy.deepcopy(sub))
             self.assertRaises(csub.IndexNumError, newsub.main)
 
@@ -340,12 +347,12 @@ class SrtFileTest (unittest.TestCase):
         errors = [TypeError, UnboundLocalError, ValueError,
                   IOError, OSError, SystemError, AttributeError,]
         for error in errors:
-            sub = StringIO.StringIO(SRT_FAKESUB_0)
+            sub = io.StringIO(SRT_FAKESUB_0)
             newsub = csub.SrtSub(sub, sub)
             newsub.match_time = get_error(error)
             try:
                 newsub.main()
-            except Exception, e:
+            except Exception as e:
                 msg = "it should be %s" % e
                 self.assertNotEqual(e, csub.MismatchTimeError, msg)
                 self.assertNotEqual(e, csub.IndexNumError, msg)
@@ -403,7 +410,7 @@ class SrtTimeTransformTest (unittest.TestCase):
         self.subs = csub.SrtSub(None, None)
         self.subs.ITER_FUNC = self.subs.make_iter_blocks(
             self.subs.text_block, lambda *args: args)
-        self.subs._get_func = self.subs.ITER_FUNC.next()
+        self.subs._get_func = next(self.subs.ITER_FUNC)
         self.sep_err = ("00:01:31,970-->00:01:33,450",
                         "00:01:31,970 -> 00:01:33,450",
                         "00:01:31,970  00:01:33,450",)
@@ -434,7 +441,7 @@ class SrtTimeTransformTest (unittest.TestCase):
 
     def update_time (self, string_time, hours, mins, secs, ms):
         self.subs.set_delta(hours, mins, secs, ms, 0)
-        h, m, s, ms = map(int, self.subs.match_time(string_time).group(1, 2, 3, 4))
+        h, m, s, ms = list(map(int, self.subs.match_time(string_time).group(1, 2, 3, 4)))
         secs, ms = self.subs.new_time_tuple(h, m, s, ms)
         nh, nm, ns = self.subs.times_from_secs(secs)
         return self.subs.string_format % (nh, nm, ns, ms)
@@ -444,7 +451,7 @@ class SrtTimeTransformTest (unittest.TestCase):
         delta_time.insert(-1, random.randint(-999, 999))
         self.subs.set_delta(*delta_time)
         new_time_string = self.subs.time_block(orig_time_string)[0]
-        self.subs.set_delta(*map(int.__neg__, delta_time))
+        self.subs.set_delta(*list(map(int.__neg__, delta_time)))
         return self.subs.time_block(new_time_string)[0]
 
     def testSrtTimeSep (self):
@@ -491,21 +498,21 @@ class TempFileTest (unittest.TestCase):
         # input and output in the same file:
         CWD = op.dirname(op.realpath(__file__))
         testsub = op.join(CWD, DATA_DIR, 'fail_sub_1.srt')
-        with open(testsub, 'rb') as ts:
+        with open(testsub, 'r') as ts:
             string_sub = ts.read()
         tmpfile = csub.TempFile(testsub)
-        with open(tmpfile.filepath, 'rb') as in_file:
-            with open(testsub, 'wb') as out_file:
+        with open(tmpfile.filepath, 'r') as in_file:
+            with open(testsub, 'w') as out_file:
                 newsub = csub.SrtSub(in_file, out_file)
                 self.assertRaises(csub.MismatchTimeError, newsub.main)
         tmpfile.write_back()
-        with open(testsub, 'rb') as ts:
+        with open(testsub, 'r') as ts:
             self.assertEqual(ts.read(), string_sub,
                              "sub file shouldn't be modified!")
         # unsafe mode, no error should be raised:
-        with open(testsub, 'rb') as ts:
+        with open(testsub, 'r') as ts:
             outfile = csub.TempFile(testsub)
-            with open(outfile.filepath, 'wb') as out:
+            with open(outfile.filepath, 'w') as out:
                 newsub = csub.SrtSub(ts, out, True)
                 newsub.main()
 
@@ -517,9 +524,9 @@ class AssFileTest (unittest.TestCase):
         _r = random.randint
         for i in range(200):
             for subtitle in subtitles:
-                sub_orig = StringIO.StringIO(subtitle)
-                sub_in = StringIO.StringIO(subtitle)
-                sub_out = StringIO.StringIO()
+                sub_orig = io.StringIO(subtitle)
+                sub_in = io.StringIO(subtitle)
+                sub_out = io.StringIO()
                 inst = csub.AssSub(sub_in, sub_out)
                 time_delta = [_r(1,3), _r(1,200), _r(1,200), _r(1,200)]
                 inst.set_delta(*time_delta)
@@ -541,8 +548,8 @@ class AssFileTest (unittest.TestCase):
         _neg = operator.neg
         _r = random.randint
         for subfile in glob.glob(op.join(CWD, DATA_DIR, 'test*.ass')):
-            with open(subfile, 'rb') as infile:
-                outfile = StringIO.StringIO()
+            with open(subfile, 'r') as infile:
+                outfile = io.StringIO()
                 inst = csub.AssSub(infile, outfile)
                 inst.main()
                 infile.seek(0)
@@ -550,9 +557,9 @@ class AssFileTest (unittest.TestCase):
                 self.assertEqual(infile.read(), outfile.read())
         for i in range(200):
             for subtitle in subtitles:
-                sub_orig = StringIO.StringIO(subtitle)
-                sub_in = StringIO.StringIO(subtitle)
-                sub_out = StringIO.StringIO()
+                sub_orig = io.StringIO(subtitle)
+                sub_in = io.StringIO(subtitle)
+                sub_out = io.StringIO()
                 inst = csub.AssSub(sub_in, sub_out)
                 time_delta = [_r(11,13), _r(1,200), _r(1,200), _r(1,200)]
                 inst.set_delta(*time_delta)
@@ -581,20 +588,20 @@ class AssFileTest (unittest.TestCase):
                      ASS_FAKESUB_5_FAIL_TIME_H,
                      ASS_FAKESUB_6_FILE_TIME_IF_NOT_B,)
         for subfile in glob.glob(op.join(CWD, DATA_DIR, 'fail*.ass')):
-            with open(subfile, 'rb') as infile:
-                outfile = StringIO.StringIO()
+            with open(subfile, 'r') as infile:
+                outfile = io.StringIO()
                 inst = csub.AssSub(infile, outfile)
                 self.assertRaises(csub.MismatchTimeError, inst.main)
         for subtitle in subtitles:
-                sub_in = StringIO.StringIO(subtitle)
-                sub_out = StringIO.StringIO()
+                sub_in = io.StringIO(subtitle)
+                sub_out = io.StringIO()
                 inst = csub.AssSub(sub_in, sub_out)
                 inst.set_delta()
                 self.assertRaises(csub.MismatchTimeError, inst.main)
         # no failure if -b option is enabled
         nofail_sub = ASS_FAKESUB_6_FILE_TIME_IF_NOT_B
-        sub_in = StringIO.StringIO(nofail_sub)
-        sub_out = StringIO.StringIO()
+        sub_in = io.StringIO(nofail_sub)
+        sub_out = io.StringIO()
         inst = csub.AssSub(sub_in, sub_out, True)
         inst.set_delta()
         inst.main()
