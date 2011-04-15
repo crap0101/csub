@@ -282,7 +282,7 @@ class SrtFileTest (unittest.TestCase):
             self.skipTest('actually not available on Windows platform')
         options = ["-H", "-M", "-S", "-m", "-n"]
         lenopt = len(options)
-        cmdline = ["python", PROGFILE]
+        cmdline = ["python3", PROGFILE]
         for sub in (SRT_FAKESUB_0, SRT_FAKESUB_1, SRT_FAKESUB_2):
             choosed = cmdline[:]
             back_to = cmdline[:]
@@ -318,7 +318,7 @@ class SrtFileTest (unittest.TestCase):
                      SRT_FAKESUB_8_FAIL_INDEX,SRT_FAKESUB_9_FAIL_INDEX, 
                      SRT_FAKESUB_3_FAIL_TIME, SRT_FAKESUB_4_FAIL_TIME, 
                      SRT_FAKESUB_5_FAIL_TIME, SRT_FAKESUB_6_FAIL_TIME,]
-        cmdline = ["python", PROGFILE]
+        cmdline = ["python3", PROGFILE]
         cmdline.append('%s srt' %
                        ('-t' if random.randint(0,1) else '--type'))
         cmdline = shlex.split(' '.join(cmdline))

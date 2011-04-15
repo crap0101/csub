@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-VERSION = '1.0'
+VERSION = '1.1'
 
-"""csub {0} - utility to synchronize subtitle files (actually: *.srt)
+"""csub {0} - utility to synchronize subtitle files
+              (actually: *.srt, *.ass, *.ssa)
 
 # Copyright (C) 2010  Marco Chieppa (aka crap0101)
 # This program is free software; you can redistribute it and/or modify
@@ -19,10 +20,6 @@ VERSION = '1.0'
 # or write to the Free Software Foundation, Inc., 
 # 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.    
 
-Changelog (2010-07-11):
-    * using tempfile for creation of a backup file to avoid
-      accidental deletion of the source sub when the input file
-      and the output file are the same.
 Examples:
   # reading from stdin and output to stdout ans ass/ssa sub:
   ~$ ./prog_name --minutes 3 --seconds -44 --milliseconds -378 -num 2 -t ass
@@ -207,7 +204,7 @@ class Subtitle:
 
     @staticmethod
     def edit_range(start=None, stop=None):
-        start = 1 if start is None else start
+        start = float('-inf') if start is None else start
         stop = float('+inf') if stop is None else stop
         def is_edit(number):
             return number >= start and number < stop
