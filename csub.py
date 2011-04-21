@@ -476,6 +476,9 @@ if __name__ == '__main__':
             out_file = open(opts.outfile, "w")
     # temporary ugly if/elif:
     if not opts.subtitle_type:
+        in_file.close()
+        out_file.close()
+        tmpfile.write_back()
         parser.error("subtitle type (-t/--type) must be specified!")
     if opts.subtitle_type in ('ass', 'ssa'):
         newsub = AssSub(in_file, out_file, opts.unsafe_time_mode)
