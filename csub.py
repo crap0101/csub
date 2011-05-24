@@ -46,11 +46,14 @@ from string import Template
 # F U N C T I O N S #
 #####################
 
-
+def close_files(files):
+    for file in files:
+        if not file.isatty() or not file.closed:
+            file.close()
+            
 def save_on_error(infile, outfile, tmpfile):
-    in_file.close()
-    out_file.close()
     tmpfile.write_back()
+    close_files((in_file, out_file, tmpfile))
 
 def numslice(n, i, keep_sign=False):
     '''
@@ -119,9 +122,11 @@ class TempFile:
         with open(self.in_file, 'rb') as _in:
             self.fd_max_pos = os.write(self.fd, _in.read())
         self.seek(0, 0)
+        self.closed = False
 
     def close (self):
         os.close(self.fd)
+        self.closed = True
 
     def read (self):
         return os.read(self.fd, self.fd_max_pos)
@@ -472,6 +477,10 @@ if __name__ == '__main__':
          parser.error("Error: unknown argument(s) %s" % args)
     if not opts.subtitle_type:
         parser.error("subtitle type (-t/--type) must be specified!")
+    if opts.infile and not os.path.isfile(opts.infile):
+        parser.error("invalid input file '%s'" % opts.infile)
+    if opts.outfile and not os.path.isfile(opts.outfile):
+        parser.error("invalid output file '%s'" % opts.outfile)
     if opts.infile == opts.outfile and all((opts.infile, opts.outfile)):
         tmpfile = TempFile(opts.infile)
         in_file = open(tmpfile.filepath, 'r')
@@ -515,5 +524,4 @@ if __name__ == '__main__':
         sys.stderr.write("%s: [at line %d] %s\n\n"
                          % (ue_msg, newsub.actual_numline, str(e)))
         sys.exit(255)
-    in_file.close()
-    out_file.close()
+    close_files((in_file, out_file))
