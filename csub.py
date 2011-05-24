@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-VERSION = '1.1'
+VERSION = '1.2'
 
 """csub {0} - utility to synchronize subtitle files
               (actually: *.srt, *.ass, *.ssa)
@@ -46,6 +46,11 @@ from string import Template
 # F U N C T I O N S #
 #####################
 
+
+def save_on_error(infile, outfile, tmpfile):
+    in_file.close()
+    out_file.close()
+    tmpfile.write_back()
 
 def numslice(n, i, keep_sign=False):
     '''
@@ -443,7 +448,7 @@ if __name__ == '__main__':
     parser.add_option("-n", "--num", type="int", dest="num",
                       default=0, metavar="NUMBER",
                       help="change the progressive subtitle number by NUMBER. "
-                      "(only for srt).")
+                      "(only for srt, ignorede with ass/ssa subs).")
     parser.add_option("-r", "--range", type="str",
                       dest="range", default=':', metavar="START:END",
                       help="apply changes only for subs between START"
@@ -465,6 +470,8 @@ if __name__ == '__main__':
         sys.exit(0)
     if args:
          parser.error("Error: unknown argument(s) %s" % args)
+    if not opts.subtitle_type:
+        parser.error("subtitle type (-t/--type) must be specified!")
     if opts.infile == opts.outfile and all((opts.infile, opts.outfile)):
         tmpfile = TempFile(opts.infile)
         in_file = open(tmpfile.filepath, 'r')
@@ -474,44 +481,40 @@ if __name__ == '__main__':
             in_file = open(opts.infile, "r")
         if opts.outfile:
             out_file = open(opts.outfile, "w")
-    # temporary ugly if/elif:
-    if not opts.subtitle_type:
-        in_file.close()
-        out_file.close()
-        tmpfile.write_back()
-        parser.error("subtitle type (-t/--type) must be specified!")
-    if opts.subtitle_type in ('ass', 'ssa'):
-        newsub = AssSub(in_file, out_file, opts.unsafe_time_mode)
-    elif opts.subtitle_type == 'srt':
+    if opts.subtitle_type == 'srt':
         newsub = SrtSub(in_file, out_file,
                         opts.unsafe_time_mode, opts.unsafe_number_mode)
         start_sub, end_sub = opts.range.split(':')
         newsub.set_subs_range(int(start_sub) if start_sub else None,
                               int(end_sub) if end_sub else None)
-    newsub.set_delta(opts.hour, opts.min, opts.sec, opts.ms, opts.num)
-    newsub.IS_WARN = opts.is_warn
-    opt_err = Template('options $what not available with ass/ssa subtitles\n')
-    if opts.subtitle_type in ('ass', 'ssa'):
+    elif opts.subtitle_type in ('ass', 'ssa'):
+        newsub = AssSub(in_file, out_file, opts.unsafe_time_mode)
+        opt_err = Template('options $what not available with ass/ssa subtitles\n')
         if opts.range != ':':
+            save_on_error(in_file, out_file, tmpfile)
             parser.error(opt_err.substitute(what='-r/--range'))
         if opts.num:
-            parser.error(opt_err.substitute(what='-n/--num'))
+            pass
+            #warning?parser.error(opt_err.substitute(what='-n/--num'))
         if opts.unsafe_number_mode:
+            save_on_error(in_file, out_file, tmpfile)
             parser.error(opt_err.substitute(what='-B/--back-to-the-block'))
+        #newsub = AssSub(in_file, out_file, opts.unsafe_time_mode)
+    newsub.set_delta(opts.hour, opts.min, opts.sec, opts.ms, opts.num)
+    newsub.IS_WARN = opts.is_warn
     try:
         newsub.main()
     except (BadFormatError, MismatchTimeError, IndexNumError) as e:
+        save_on_error(in_file, out_file, tmpfile)
         sys.stderr.write("%s: [at line %d] %s\n"
              % (e.__class__.__name__, newsub.actual_numline, str(e)))
-        in_file.close()
-        out_file.close()
-        tmpfile.write_back()
+        sys.exit(1)
     except Exception as e:
-        in_file.close()
-        out_file.close()
-        tmpfile.write_back()
+        save_on_error(in_file, out_file, tmpfile)
         ue_msg = "\nUnknow error! surely a bug. Shit!\nException is"
         sys.stderr.write("%s: [at line %d] %s\n\n"
                          % (ue_msg, newsub.actual_numline, str(e)))
+
+        sys.exit(255)
     in_file.close()
     out_file.close()
