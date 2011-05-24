@@ -392,7 +392,6 @@ class SrtReTest (unittest.TestCase):
         for string in self.time_string_err:
             self.assertRaises(csub.MismatchTimeError,
                               self.subs.match_time, string)
-        
 
     def testSrtReNumber (self):
         for string in self.number_string_ok:
