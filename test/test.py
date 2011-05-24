@@ -273,11 +273,10 @@ Dialogue: 0,0:08:43.44,0:08:46.27,Default,,0000,0000,0000,,E non sono state usat
 """
 
 
-
 class SrtFileTest (unittest.TestCase):
     """Test operation on files. """
 
-    def testOkSrtSubs (self):
+    def testOkSrtSub (self):
         if platform.system() == 'Windows':
             self.skipTest('actually not available on Windows platform')
         options = ["-H", "-M", "-S", "-m", "-n"]
