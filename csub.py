@@ -448,7 +448,7 @@ if __name__ == '__main__':
     parser.add_option("-n", "--num", type="int", dest="num",
                       default=0, metavar="NUMBER",
                       help="change the progressive subtitle number by NUMBER. "
-                      "(only for srt, ignorede with ass/ssa subs).")
+                      "(only for srt, ignored with ass/ssa subs).")
     parser.add_option("-r", "--range", type="str",
                       dest="range", default=':', metavar="START:END",
                       help="apply changes only for subs between START"
@@ -514,7 +514,6 @@ if __name__ == '__main__':
         ue_msg = "\nUnknow error! surely a bug. Shit!\nException is"
         sys.stderr.write("%s: [at line %d] %s\n\n"
                          % (ue_msg, newsub.actual_numline, str(e)))
-
         sys.exit(255)
     in_file.close()
     out_file.close()
