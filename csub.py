@@ -421,7 +421,6 @@ class SrtSub (Subtitle):
 if __name__ == '__main__':
     in_file = sys.stdin 
     out_file = sys.stdout
-    samefile = False
     tmpfile = TempFile(None)
 
     parser = OptionParser(version="csub %s" % VERSION)
