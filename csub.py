@@ -4,7 +4,6 @@
 VERSION = '1.2'
 
 """csub {0} - utility to synchronize subtitle files
-              (actually: *.srt, *.ass, *.ssa)
 
 # Copyright (C) 2010  Marco Chieppa (aka crap0101)
 # This program is free software; you can redistribute it and/or modify
@@ -20,6 +19,11 @@ VERSION = '1.2'
 # or write to the Free Software Foundation, Inc., 
 # 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.    
 
+Supported formats:
+  - SubRip (*.srt)
+  - (Advanced) SubStation Alpha (*.ass, *.ssa)
+  - MicroDVD (*.sub)
+  
 Examples:
   # reading from stdin and output to stdout ans ass/ssa sub:
   ~$ ./prog_name --minutes 3 --seconds -44 --milliseconds -378 -num 2 -t ass
@@ -109,7 +113,7 @@ def TempFileManager (methods):
 # C L A S S E S #
 #################
 
-@TempFileManager(('close', 'read', 'seek', 'write_back'))
+@TempFileManager(('close', 'isatty', 'read', 'seek', 'write_back'))
 class TempFile:
     """Class to manage temp file (using tmpfile's mkstemp). """
     def __init__ (self, in_file, options=None):
@@ -127,6 +131,9 @@ class TempFile:
     def close (self):
         os.close(self.fd)
         self.closed = True
+
+    def isatty(self):
+        return os.isatty(self.fd)
 
     def read (self):
         return os.read(self.fd, self.fd_max_pos)
@@ -202,7 +209,7 @@ class Subtitle:
         self.RE_MATCH_NUMBER = re.compile('^-{0,1}\d+$')
         self.MAX_H = 3600
         self.MAX_MIN = 60
-        self.MAX_HNDRS = 100 # for ssa/ass
+        self.MAX_HNDRS = 100 # for SubStation Alpha
         self.MAX_MS = 1000
         self.delta_hour = self.delta_min = self.delta_sec = 0
         self.delta_ms = self.delta_sub_num = 0
@@ -242,7 +249,8 @@ class Subtitle:
         """
         matched = re.match(self.RE_MATCH_TIME, string_time)
         if matched is None:
-            raise MismatchTimeError("'%s' (in %s)" % (string_time, "match_time"))
+            raise MismatchTimeError(
+                "'%s' (in %s)" % (string_time, "match_time"))
         return matched
 
     def new_sub_num (self, num_str):
@@ -290,12 +298,67 @@ class Subtitle:
         return hour, m / self.MAX_MIN, total_sec % self.MAX_MIN
 
 
+class MicroDVD (Subtitle):
+    """
+    Class to manage MicroDVD (*.sub) subtitle. Inherit from Subtitle.
+    """
+    def __init__ (self, file_in, file_out, frames=25,
+                  unsafe_time_mode=False, use_secs=False):
+        """file_in and file_out must be file-like objects."""
+        str_fmt = '{%d}{%d}%s\n'
+        reg = '^{(\d+)}{(\d+)}(.*)$'
+        reg_unsafe = '^{(-{0,1}\d+)}{(-{0,1}\d+)}(.*)$'
+        super(MicroDVD, self).__init__(
+            str_fmt,
+            reg if not unsafe_time_mode else reg_unsafe)
+        self.frames = frames
+        self.delta_frames = 0
+        self.infile = file_in
+        self.outfile = file_out
+        self._use_sec = use_secs
+
+    def frame_use_secs(self, frame):
+        secs, r = divmod(frame,self.frames)
+        new_frame = r + int(sum((self.delta_hour * self.MAX_H,
+                                 self.delta_min * self.MAX_MIN,
+                                 secs + self.delta_sec,
+                                 self.delta_ms))
+                            * self.frames)
+        return new_frame
+
+    def _new_time(self, frames):
+        return list(self.frame_use_secs(f) for f in frames)
+                                  
+    def _new_frames(self, frames):
+        return list(x + self.delta_frames for x in frames)
+
+    new_time = _new_frames
+
+    def set_delta (self, hour=0, min_=0, sec=0, ms=0, delta_frames=0):
+        """Set time's attribute."""
+        super(MicroDVD, self).set_delta(hour, min_, sec, ms, 0)
+        self.delta_frames = delta_frames
+
+    def main(self):
+        if self._use_sec:
+            self.new_time = self._new_time
+        for self.actual_numline, line in zip(itertools.count(1), self.infile):
+            *time, rest = self.match_time(line).groups()
+            start, end = self.new_time(map(int, time))
+            self.outfile.write(self.STRING_FORMAT % (start, end, rest))
+
+
 class AssSub (Subtitle):
-    """Class to manage *.ass/*.ssa subtitle. Inherit from Subtitle."""
+    """
+    Class to manage (Advanced) SubStation Alpha (*.ass/*.ssa) subtitle.
+    Inherit from Subtitle.
+    """
     def __init__ (self, file_in, file_out, unsafe_time_mode=False):
         """`file_in' and `file_out' must be file-like objects."""
-        reg = '(^Dialogue: \d+),(\d{1}:\d{2}:\d{2}([:\.])\d{2}),(\d{1}:\d{2}:\d{2}([:.])\d{2}),(.*$)'
-        reg_unsafe = '(^Dialogue: \d+),(-{0,1}\d+:\d{2}:\d{2}([:\.])\d{2}),(-{0,1}\d+:\d{2}:\d{2}([:.])\d{2}),(.*$)'
+        reg = '(^Dialogue: \d+),(\d{1}:\d{2}:\d{2}([:\.])\d{2}),'\
+              '(\d{1}:\d{2}:\d{2}([:.])\d{2}),(.*$)'
+        reg_unsafe = '(^Dialogue: \d+),(-{0,1}\d+:\d{2}:\d{2}([:\.])\d{2}),'\
+                     '(-{0,1}\d+:\d{2}:\d{2}([:.])\d{2}),(.*$)'
         time_reg = '(\d{1}):(\d{2}):(\d{2})[:\.](\d{2})'
         time_reg_unsafe = '(-{0,1}\d+):(\d{2}):(\d{2})[:\.](\d{2})'
         # Why these regex? well...
@@ -303,7 +366,8 @@ class AssSub (Subtitle):
         # 0:00:00:00  (so, *1* digit for hours and the colon as divider)
         # ie. Hrs:Mins:Secs:hundredths
         # BUT... some ass/ssa file use dot between Secs and hundredths,
-        # and many player accept this; so, we want to preserve the original sep.
+        # and seems that many player accept these; so, we want to
+        # preserve the original separator.
         self.reg = (re.compile(reg) if not unsafe_time_mode
                     else re.compile(reg_unsafe))
         self.time_reg = (re.compile(time_reg) if not unsafe_time_mode
@@ -319,10 +383,11 @@ class AssSub (Subtitle):
         # milliseconds (to avoid rewrite methos in the base class).
         
     def new_time(self, time_string, sec_sep):
-        h, m, s, hndrs = list(map(int, self.time_reg.match(time_string).groups()))
+        h, m, s, hndrs = list(map(
+            int, self.time_reg.match(time_string).groups()))
         total_secs, hndrs = self.new_time_tuple(h, m, s, hndrs)
         h, m, s = self.times_from_secs(total_secs)
-        return "%d:%02d:%02d%s%02d" % (h, m, s, sec_sep, hndrs) #numslice(hndrs, 2))
+        return "%d:%02d:%02d%s%02d" % (h, m, s, sec_sep, hndrs)
 
     def parse_line (self, line):
         """Fields are:
@@ -338,12 +403,13 @@ class AssSub (Subtitle):
                 new_end = self.new_time(end, end_sep)
                 return ','.join((init, new_start, new_end, rest))
             except ValueError as err:
-                raise MismatchTimeError("(%s) Something went wrong "
-                                        "computing this line: %s" % (err, line))
+                raise MismatchTimeError(
+                    "(%s) Something went wrong "
+                    "computing this line: %s" % (err, line))
             except AttributeError as err:
-                raise MismatchTimeError("You probably need to "
-                                        "--back-to-the-future\n"
-                                        "ERR LINE IS: %s" % line)            
+                raise MismatchTimeError(
+                    "You probably need to --back-to-the-future\n"
+                    "ERR LINE IS: %s" % line)            
         return line
 
     def set_delta(self, hour=0, min_=0, sec=0, hndrs=0, *not_used):
@@ -357,13 +423,16 @@ class AssSub (Subtitle):
 
         
 class SrtSub (Subtitle):
-    """Class to manage *.srt subtitle. Inherit from Subtitle."""
-
-    def __init__ (self, file_in, file_out, unsafe_time_mode=False, unsafe_number_mode=False):
-        """`file_in' and `file_out' must be file-like objects."""
+    """
+    Class to manage SubRip (*.srt) subtitle.
+    Inherit from Subtitle.
+    """
+    def __init__ (self, file_in, file_out,
+                  unsafe_time_mode=False, unsafe_number_mode=False):
+        """file_in and file_out must be file-like objects."""
         self.time_sep = " --> "
         self.string_format = "%02d:%02d:%02d,%03d"
-        reg_safe = r'^(-{0,1}\d{2,}):(\d{2}):(\d{2}),(\d{3})$'
+        reg_safe =   r'^(\d{2}):(\d{2}):(\d{2}),(\d{3})$'
         reg_unsafe = r'^(-{0,1}\d{1,}):(\d{2}):(\d{2}),(\d{3})$'
         self.re_pattern = reg_unsafe if unsafe_time_mode else reg_safe
         self.unsafe_number_mode = unsafe_number_mode
@@ -428,13 +497,21 @@ if __name__ == '__main__':
                       help="print informations about the program and exit.")
     parser.add_option("-t", "--type",type="string",
                       dest="subtitle_type", metavar="TYPE",
-                      help="subtitle file type: ass, ssa, srt.")
+                      help="subtitle file type: (ass|ssa, srt, sub|microdvd).")
     parser.add_option("-o", "--output-file",type="string",
                       dest="outfile", metavar="FILE",
                       help="write the subtitle in FILE (default: stdout).")
     parser.add_option("-i", "--input-file", type="string",
                       dest="infile", metavar="FILE",
                       help="read the subtitle from FILE (default: stdin).")
+    parser.add_option("-f", "--delta-frames", type="int",
+                      default=0, dest="delta_frames", metavar="NUMBER",
+                      help="change the frames values by NUMBER "
+                      "(only for microDVD).")
+    parser.add_option("-F", "--frames", type="int",
+                      default=25, dest="frames", metavar="NUMBER",
+                      help="the movie's frame rate (eg. 25, 29.97, 23.976) "
+                      "(default: 25. Only for microDVD).")
     parser.add_option("-S", "--seconds", type="int",
                       default=0, dest="sec", metavar="NUMBER",
                       help="change the seconds values by NUMBER.")
@@ -451,8 +528,8 @@ if __name__ == '__main__':
                       "(NOTE: this value must be in range -999..999).")
     parser.add_option("-n", "--num", type="int", dest="num",
                       default=0, metavar="NUMBER",
-                      help="change the progressive subtitle number by NUMBER. "
-                      "(only for srt, ignored with ass/ssa subs).")
+                      help="change the progressive subtitle number by NUMBER."
+                      " (only for srt, ignored with ass/ssa subs).")
     parser.add_option("-r", "--range", type="str",
                       dest="range", default=':', metavar="START:END",
                       help="apply changes only for subs between START"
@@ -478,8 +555,8 @@ if __name__ == '__main__':
         parser.error("subtitle type (-t/--type) must be specified!")
     if opts.infile and not os.path.isfile(opts.infile):
         parser.error("invalid input file '%s'" % opts.infile)
-    if opts.outfile and not os.path.isfile(opts.outfile):
-        parser.error("invalid output file '%s'" % opts.outfile)
+    #if opts.outfile and not os.path.isfile(opts.outfile):
+    #    parser.error("invalid output file '%s'" % opts.outfile)
     if opts.infile == opts.outfile and all((opts.infile, opts.outfile)):
         tmpfile = TempFile(opts.infile)
         in_file = open(tmpfile.filepath, 'r')
@@ -495,20 +572,43 @@ if __name__ == '__main__':
         start_sub, end_sub = opts.range.split(':')
         newsub.set_subs_range(int(start_sub) if start_sub else None,
                               int(end_sub) if end_sub else None)
-    elif opts.subtitle_type in ('ass', 'ssa'):
-        newsub = AssSub(in_file, out_file, opts.unsafe_time_mode)
-        opt_err = Template('options $what not available with ass/ssa subtitles\n')
+        newsub.set_delta(opts.hour, opts.min, opts.sec, opts.ms, opts.num)
+    elif opts.subtitle_type in ('sub', 'microdvd'):
+        use_secs = any((opts.hour, opts.min, opts.sec, opts.ms))
+        newsub = MicroDVD(in_file, out_file, opts.frames,
+                          opts.unsafe_time_mode, use_secs)
+        if opts.delta_frames and use_secs:
+            save_on_error(in_file, out_file, tmpfile)
+            parser.error("You can't use frames and time delta together")
+        #TODO: merge with ssa/ass in another function (and check before):
+        opt_err = Template(
+            'options $what not available with sub/microdvd subtitles\n')
         if opts.range != ':':
             save_on_error(in_file, out_file, tmpfile)
             parser.error(opt_err.substitute(what='-r/--range'))
         if opts.num:
-            pass
-            #warning?parser.error(opt_err.substitute(what='-n/--num'))
+            save_on_error(in_file, out_file, tmpfile)
+            parser.error(opt_err.substitute(what='-n/--num'))
+        if opts.unsafe_number_mode:
+            save_on_error(in_file, out_file, tmpfile)
+            parser.error(opt_err.substitute(what='-B/--back-to-the-block'))
+        newsub.set_delta(opts.hour, opts.min, opts.sec,
+                         opts.ms, opts.delta_frames)
+    elif opts.subtitle_type in ('ass', 'ssa'):
+        newsub = AssSub(in_file, out_file, opts.unsafe_time_mode)
+        opt_err = Template(
+            'options $what not available with ass/ssa subtitles\n')
+        if opts.range != ':':
+            save_on_error(in_file, out_file, tmpfile)
+            parser.error(opt_err.substitute(what='-r/--range'))
+        if opts.num:
+            save_on_error(in_file, out_file, tmpfile)
+            parser.error(opt_err.substitute(what='-n/--num'))
         if opts.unsafe_number_mode:
             save_on_error(in_file, out_file, tmpfile)
             parser.error(opt_err.substitute(what='-B/--back-to-the-block'))
         #newsub = AssSub(in_file, out_file, opts.unsafe_time_mode)
-    newsub.set_delta(opts.hour, opts.min, opts.sec, opts.ms, opts.num)
+        newsub.set_delta(opts.hour, opts.min, opts.sec, opts.ms, opts.num)
     newsub.IS_WARN = opts.is_warn
     try:
         newsub.main()
