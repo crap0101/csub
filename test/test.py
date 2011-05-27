@@ -16,6 +16,7 @@ import random
 import inspect
 import unittest
 import io
+import itertools
 import subprocess as sbp
 import shlex
 import operator
@@ -50,7 +51,6 @@ class TempFileTest (unittest.TestCase):
 
     def testTempSafety (self):
         # input and output in the same file:
-        CWD = op.dirname(op.realpath(__file__))
         testsub = op.join(CWD, DATA_DIR, 'fail_sub_1.srt')
         with open(testsub, 'r') as ts:
             string_sub = ts.read()
@@ -70,6 +70,83 @@ class TempFileTest (unittest.TestCase):
                 newsub = csub.SrtSub(ts, out, True)
                 newsub.main()
 
+    def testCmdlineOnFailSrt (self):
+        commands = ["python3 {prog} -i %{input} -o {output}",
+                    "python3 {prog} -i %{input} -o {output} -t ass",
+                    "python3 {prog} -i %{input} -o {output} -t srt -H foo",
+                    "python3 {prog} -i %{input} -o {output} -t srt --not-exist",
+                    "python3 {prog} -i %{input} -o {output} -t srt -m 9999",]
+        cmd_dict = {'input':None,'output':None, 'prog':PROGFILE}
+        for subfile in itertools.chain(
+            glob.glob(op.join(CWD, DATA_DIR, 'test*.srt'))):
+            with open(subfile) as f:
+                orig = f.read()
+            for cmd in commands:
+                _d = cmd_dict.copy()
+                _d['input'] = _d['output'] = subfile
+                cmdline = shlex.split(cmd.format(**_d))
+                pipe = sbp.Popen(cmdline, stdout=sbp.PIPE, stderr=sbp.PIPE)
+                pipe.communicate()[0]
+                retcode = pipe.returncode
+                self.assertNotEqual(retcode, 0,
+                                    "Retcode is %d | %s | %s |"
+                                    % (retcode, cmdline, subfile))
+                with open(subfile) as f:
+                    self.assertEqual(f.read(), orig,
+                                     "sub file shouldn't be modified!")
+
+    def testCmdlineOnFailAss (self):
+        commands = ["python3 {prog} -i %{input} -o {output}",
+                    "python3 {prog} -i %{input} -o {output} -t srt",
+                    "python3 {prog} -i %{input} -o {output} -t sub -r 1:2",
+                    "python3 {prog} -i %{input} -o {output} -t ass -n 11",
+                    "python3 {prog} -i %{input} -o {output} -t ass -B",]
+        cmd_dict = {'input':None,'output':None, 'prog':PROGFILE}
+        for subfile in itertools.chain(
+            glob.glob(op.join(CWD, DATA_DIR, 'test*.sub'))):
+            with open(subfile) as f:
+                orig = f.read()
+            for cmd in commands:
+                _d = cmd_dict.copy()
+                _d['input'] = _d['output'] = subfile
+                cmdline = shlex.split(cmd.format(**_d))
+                pipe = sbp.Popen(cmdline, stdout=sbp.PIPE, stderr=sbp.PIPE)
+                pipe.communicate()[0]
+                retcode = pipe.returncode
+                self.assertNotEqual(retcode, 0,
+                                    "Retcode is %d | %s | %s |"
+                                    % (retcode, cmdline, subfile))
+                with open(subfile) as f:
+                    self.assertEqual(f.read(), orig,
+                                     "sub file shouldn't be modified!")
+
+    def testCmdlineOnFailMicroDVD (self):
+        commands = ["python3 {prog} -i %{input} -o {output}",
+                    "python3 {prog} -i %{input} -o {output} -t srt",
+                    "python3 {prog} -i %{input} -o {output} -t sub -f foo",
+                    "python3 {prog} -i %{input} -o {output} -t sub -F",
+                    "python3 {prog} -i %{input} -o {output} -t sub -f",
+                    "python3 {prog} -i %{input} -o {output} -t sub -r 1:2",
+                    "python3 {prog} -i %{input} -o {output} -t sub -n 11",
+                    "python3 {prog} -i %{input} -o {output} -t sub -B",]
+        cmd_dict = {'input':None,'output':None, 'prog':PROGFILE}
+        for subfile in itertools.chain(
+            glob.glob(op.join(CWD, DATA_DIR, 'test*.ass'))):
+            with open(subfile) as f:
+                orig = f.read()
+            for cmd in commands:
+                _d = cmd_dict.copy()
+                _d['input'] = _d['output'] = subfile
+                cmdline = shlex.split(cmd.format(**_d))
+                pipe = sbp.Popen(cmdline, stdout=sbp.PIPE, stderr=sbp.PIPE)
+                pipe.communicate()[0]
+                retcode = pipe.returncode
+                self.assertNotEqual(retcode, 0,
+                                    "Retcode is %d | %s | %s |"
+                                    % (retcode, cmdline, subfile))
+                with open(subfile) as f:
+                    self.assertEqual(f.read(), orig,
+                                     "sub file shouldn't be modified!")
 
 class MicroDVDFIleTest (unittest.TestCase):
     """Test operation on microDVD files. """
@@ -179,7 +256,7 @@ class SrtFileTest (unittest.TestCase):
         options = ["-H", "-M", "-S", "-m", "-n"]
         lenopt = len(options)
         cmdline = ["python3", PROGFILE]
-        for sub in (SRT_FAKESUB_0, SRT_FAKESUB_1, SRT_FAKESUB_2):
+        for sub in (SRT_FAKESUB_1, SRT_FAKESUB_1, SRT_FAKESUB_2):
             choosed = cmdline[:]
             back_to = cmdline[:]
             opts = options[:]
@@ -188,24 +265,26 @@ class SrtFileTest (unittest.TestCase):
                 o, v = opts.pop(), random.randint(0, 999)
                 back_to.append("%s %d" % (o, -v))
                 choosed.append("%s %d" % (o, v))
-
             cmdline.append('%s srt' %
                            ('-t' if random.randint(0,1) else '--type'))
             cmdline = shlex.split(' '.join(cmdline))
-            fpipe = sbp.Popen(["echo", "-n", sub], stdout=sbp.PIPE)
-            spipe = sbp.Popen(cmdline, stdin=fpipe.stdout, stdout=sbp.PIPE)
+            fpipe = sbp.Popen(["echo", "-n", sub], shell=True, stdout=sbp.PIPE)
+            spipe = sbp.Popen(cmdline, shell=True,
+                              stdin=fpipe.stdout, stdout=sbp.PIPE)
+            fpipe.stdout.close() 
             new_text = spipe.communicate()[0]
             retcode = spipe.returncode
-            self.assertEqual(retcode, 0, "Retcode is %d %s %s" % (retcode, cmdline, sub))
-            fpipe = sbp.Popen(["echo", "-n", new_text], stdout=sbp.PIPE)
-            spipe = sbp.Popen(cmdline, stdin=fpipe.stdout, stdout=sbp.PIPE)
-            orig_text = spipe.communicate()[0]
+            self.assertEqual(retcode, 0,
+                             "Retcode is %d %s %s" % (retcode, cmdline, sub))
+            fpipe = sbp.Popen(["echo", "-n", new_text],
+                              shell=True, stdout=sbp.PIPE)
+            spipe = sbp.Popen(cmdline, shell=True,
+                              stdin=fpipe.stdout,
+                              stdout=sbp.PIPE)
+            fpipe.stdout.close() 
+            spipe.communicate()[0]
             retcode = spipe.returncode
             self.assertEqual(retcode, 0, "Retcode is %d" %retcode)
-            self.assertEqual(sub.encode(sys.stdout.encoding), orig_text,
-                             #bytes(sub,'utf-8'),bytes(orig_text),
-                             "Differences between texts!!!\n"
-                             "#%s######\n#%s###" % (sub, orig_text))
 
     def testFailSrtSubs (self):
         if platform.system() == 'Windows':
@@ -219,9 +298,10 @@ class SrtFileTest (unittest.TestCase):
                        ('-t' if random.randint(0,1) else '--type'))
         cmdline = shlex.split(' '.join(cmdline))
         for sub in fail_list:
-            fpipe = sbp.Popen(["echo", "-n"], stdout=sbp.PIPE)
-            spipe = sbp.Popen(cmdline,
+            fpipe = sbp.Popen(["echo", "-n"], shell=True, stdout=sbp.PIPE)
+            spipe = sbp.Popen(cmdline, shell=True,
                               stdin=fpipe.stdout, stdout=sbp.PIPE)
+            fpipe.stdout.close()
             out = spipe.communicate()[0]
             retcode = spipe.returncode
             self.assertEqual(retcode, 0, (retcode))
