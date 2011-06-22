@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-VERSION = '1.2'
+VERSION = '1.2_20110622'
 
 """csub {0} - utility to synchronize subtitle files
 
@@ -52,13 +52,14 @@ from string import Template
 #####################
 
 def close_files(files):
+    """Close any file in *files* if not a tty or already closed."""
     for file in files:
         if not file.isatty() or not file.closed:
             file.close()
 
 
 def iterdec (multicall=False):
-    """Decorator used on the line's ckeck methods. """
+    """Decorator used on the line's ckeck methods."""
     def _iterdec1 (function):
         def _iterdec2 (*args, **kwords):
             res = function(*args, **kwords)
@@ -84,6 +85,7 @@ def numslice(n, i, keep_sign=False):
     return sign_op(divmod(n, 10**m)[g]) if keep_sign else divmod(n, 10**m)[g]
 
 def save_on_error(infile, outfile, tmpfile):
+    """Save files on error, to preserv data."""
     tmpfile.write_back()
     close_files((in_file, out_file, tmpfile))
 
@@ -92,7 +94,7 @@ def skip_bytes(stream, nbytes):
     return stream.read(nbytes)
 
 def TempFileManager (methods):
-    """Decorator for temp files. """
+    """Decorator for temp files."""
     def inner1 (cls):
         def inner2 (file_stream, options=None):
             if file_stream and file_stream != sys.stdin:
@@ -107,6 +109,7 @@ def TempFileManager (methods):
 
 
 def get_parser():
+    """Return an argparse's parser object."""
     parser = argparse.ArgumentParser(version="csub %s" % VERSION)
     parser.add_argument("--info", dest="info", action="store_true",
                         help="print informations about the program and exit.")
@@ -182,7 +185,7 @@ def get_parser():
 
 @TempFileManager(('close', 'isatty', 'read', 'seek', 'write_back'))
 class TempFile:
-    """Class to manage temp file (using tmpfile's mkstemp). """
+    """Class to manage temp file (using tmpfile's mkstemp)."""
     def __init__ (self, in_file, options=None):
         self.opts = {'suffix': '.csub-backup',
                      'prefix': 'subtitle_',
@@ -215,50 +218,42 @@ class TempFile:
 
 
 class BadFormatError (Exception):
-    """Base class for formatting errors. """
+    """Base class for formatting errors."""
     pass
 
 
 class MismatchTimeError (BadFormatError):
-    """Raised when a malformed time is found. """
-
+    """Raised when a malformed time is found."""
     def __init__ (self, message):
         super().__init__()
         self.message = message
-
     def __str__ (self):
         return "Invalid time format: %s" % self.message
 
 
 class IndexNumError (BadFormatError):
-    """Raised when a malformed subs identifier is found. """
-
+    """Raised when a malformed subs identifier is found."""
     def __init__ (self, message):
         super().__init__()
         self.message = message
-
     def __str__ (self):
         return "Invalid subtitle number: %s" % repr(self.message)
 
 
 class IncompleteBlockError (Warning):
-    """Raised for incomplete block at the EOF (e.g. no newline). """
-
+    """Raised for incomplete block at the EOF (e.g. no newline)."""
     def __init__ (self, message):
         super().__init__()
         self.message = message
-
     def __str__ (self):
         return self.message
     
 
 class GetFunc:
-    """ Help class to iterate over the line's check methods. """
-
+    """Help class to iterate over the line's check methods."""
     def __init__ (self, cycle):
         self.cycle = cycle
         self.function = next(cycle)
-
     def __call__ (self, *args, **kwords):
         res, change = self.function(*args, **kwords)
         if change:
@@ -267,7 +262,8 @@ class GetFunc:
 
 
 class Subtitle:
-    """Base class implementing common function for time manipulation
+    """
+    Base class implementing common function for time manipulation
     and subtitles formatting.
     """
     def __init__ (self, str_format='', re_pattern='.*'):
@@ -288,6 +284,11 @@ class Subtitle:
 
     @staticmethod
     def edit_range(start=None, stop=None):
+        """
+        Return a function giving one argument (a number)
+        used to check if the given number (the subtitle's index number
+        in this case) is in the [start, stop] range and must be edited.
+        """
         start = float('-inf') if start is None else start
         stop = float('+inf') if stop is None else stop
         def is_edit(number):
@@ -303,15 +304,16 @@ class Subtitle:
         self.delta_sub_num = sub_number
 
     def set_subs_range(self, start=None, end=None):
-        """Set blocks' range to edit, from `start' to `end' (excluded)."""
+        """Set blocks range to edit, from `start' to `end' (excluded)."""
         self.check_range_to_edit = self.edit_range(start, end)
 
     def make_iter_blocks (self, *methods):
-        """Returns an itertools.cycle object for *methods. """
+        """Returns an itertools.cycle object for *methods."""
         return itertools.cycle(methods)
 
     def match_time (self, string_time):
-        """Check the time-line and return the matched values
+        """
+        Check the time-line and return the matched values
         or raise MismatchTimeError.
         """
         matched = re.match(self.RE_MATCH_TIME, string_time)
@@ -321,7 +323,8 @@ class Subtitle:
         return matched
 
     def new_sub_num (self, num_str):
-        """Check the subtitle's number and return it
+        """
+        Check the subtitle's number and return it
         or raise IndexNumError.
         """
         matched = re.match(self.RE_MATCH_NUMBER, num_str.rstrip())
@@ -339,7 +342,8 @@ class Subtitle:
             return int(num_str)
 
     def new_time_tuple (self, hour, min_, sec, ms):
-        """Returns a tuple of (seconds, ms)
+        """
+        Returns a tuple of (seconds, ms)
         updated according to the delta.
         """
         total_sec = sum(((hour + self.delta_hour) * self.MAX_H,
@@ -352,13 +356,17 @@ class Subtitle:
         return total_sec, abs(new_ms)
 
     def parse (self, lines, itertools_cycle_iterator):
-        """Iterate over subtitle's ``lines''"""
+        """Iterate over subtitle's *lines*, using
+        *itertools_cycle_iterator* for get the right function
+        to manipulate the given line.
+        """
         get_func = GetFunc(itertools_cycle_iterator)
         for line, self.actual_numline in zip(lines, itertools.count(1)):
             yield "%s\n" % get_func(line)
 
     def times_from_secs (self, total_sec):
-        """Returns a tuple of (hour, minutes, secs)
+        """
+        Returns a tuple of (hour, minutes, secs)
         from a time expressed in seconds.
         """
         hour, m = divmod(total_sec, self.MAX_H)
@@ -375,9 +383,7 @@ class MicroDVD (Subtitle):
         str_fmt = '{%d}{%d}%s\n'
         reg = '^{(\d+)}{(\d+)}(.*)$'
         reg_unsafe = '^{(-{0,1}\d+)}{(-{0,1}\d+)}(.*)$'
-        super(MicroDVD, self).__init__(
-            str_fmt,
-            reg if not unsafe_time_mode else reg_unsafe)
+        super().__init__(str_fmt, reg if not unsafe_time_mode else reg_unsafe)
         self.frames = frames
         self.delta_frames = 0
         self.infile = file_in
@@ -385,13 +391,12 @@ class MicroDVD (Subtitle):
         self._use_sec = use_secs
 
     def frame_use_secs(self, frame):
-        secs, r = divmod(frame,self.frames)
-        new_frame = r + int(sum((self.delta_hour * self.MAX_H,
-                                 self.delta_min * self.MAX_MIN,
-                                 secs + self.delta_sec,
-                                 self.delta_ms))
-                            * self.frames)
-        return new_frame
+        secs, r = divmod(frame, self.frames)
+        return r + int(sum((self.delta_hour * self.MAX_H,
+                            self.delta_min * self.MAX_MIN,
+                            secs + self.delta_sec,
+                            self.delta_ms))
+                       * self.frames)
 
     def _new_time(self, frames):
         return list(self.frame_use_secs(f) for f in frames)
@@ -407,6 +412,7 @@ class MicroDVD (Subtitle):
         self.delta_frames = delta_frames
 
     def main(self):
+        """Do the job."""
         if self._use_sec:
             self.new_time = self._new_time
         for self.actual_numline, line in zip(itertools.count(1), self.infile):
@@ -439,7 +445,7 @@ class AssSub (Subtitle):
                     else re.compile(reg_unsafe))
         self.time_reg = (re.compile(time_reg) if not unsafe_time_mode
                                         else re.compile(time_reg_unsafe))
-        super(AssSub, self).__init__()
+        super().__init__()
         self.file_in = file_in
         self.file_out = file_out
         self.actual_numline = 0
@@ -450,6 +456,7 @@ class AssSub (Subtitle):
         # milliseconds (to avoid rewrite methos in the base class).
         
     def new_time(self, time_string, sec_sep):
+        """Return a string representing the the subtitle time."""
         h, m, s, hndrs = list(map(
             int, self.time_reg.match(time_string).groups()))
         total_secs, hndrs = self.new_time_tuple(h, m, s, hndrs)
@@ -457,7 +464,8 @@ class AssSub (Subtitle):
         return "%d:%02d:%02d%s%02d" % (h, m, s, sec_sep, hndrs)
 
     def parse_line (self, line):
-        """Fields are:
+        """
+        Parse a SubStation Alpha subtitle's line. Fields are:
           Marked, Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
         we care about fields 1 and 2.
         """
@@ -503,19 +511,19 @@ class SrtSub (Subtitle):
         reg_unsafe = r'^(-{0,1}\d{1,}):(\d{2}):(\d{2}),(\d{3})$'
         self.re_pattern = reg_unsafe if unsafe_time_mode else reg_safe
         self.unsafe_number_mode = unsafe_number_mode
-        super(SrtSub, self).__init__(self.string_format, self.re_pattern)
+        super().__init__(self.string_format, self.re_pattern)
         self.file_in = file_in
         self.file_out = file_out
 
     @iterdec()
     def num_block (self, nums_string):
-        """Check the subtitle's number identifier lines. """
+        """Check the subtitle's number identifier lines."""
         self.IS_BLOCK = True
         return self.new_sub_num(nums_string)
 
     @iterdec()
     def time_block (self, time_string):
-        """Check the time lines. """
+        """Check the time lines."""
         if not self.IN_RANGE:
             return time_string.rstrip()
         try:
@@ -535,7 +543,7 @@ class SrtSub (Subtitle):
 
     @iterdec(multicall=True)
     def text_block (self, line):
-        """Returns the text line rstripped (no checks needed). """
+        """Returns the text line rstripped (no checks needed)."""
         self.IS_BLOCK = False
         return line.rstrip()
 
@@ -558,6 +566,7 @@ if __name__ == '__main__':
     in_file = sys.stdin 
     out_file = sys.stdout
     tmpfile = TempFile(None)
+    opt_err = Template('options $what not available with $subtype subtitles\n')
     parser = get_parser()
     opts = parser.parse_args()
     if opts.info:
@@ -602,52 +611,51 @@ if __name__ == '__main__':
         if opts.delta_frames and use_secs:
             save_on_error(in_file, out_file, tmpfile)
             parser.error("You can't use frames and time delta together")
-        #TODO: merge with ssa/ass in another function (and check before):
-        opt_err = Template(
-            'options $what not available with sub/microdvd subtitles\n')
+        #TODO: merge with srt/ssa/ass in another function (and check before):
         if opts.range != ':':
             save_on_error(in_file, out_file, tmpfile)
-            parser.error(opt_err.substitute(what='-r/--range'))
+            parser.error(opt_err.substitute(
+                subtype='microdvd', what='-r/--range'))
         if opts.num:
             save_on_error(in_file, out_file, tmpfile)
-            parser.error(opt_err.substitute(what='-n/--num'))
+            parser.error(opt_err.substitute(
+                subtype='microdvd', what='-n/--num'))
         if opts.unsafe_number_mode:
             save_on_error(in_file, out_file, tmpfile)
-            parser.error(opt_err.substitute(what='-B/--back-to-the-block'))
+            parser.error(opt_err.substitute(
+                subtype='microdvd', what='-B/--back-to-the-block'))
         newsub.set_delta(opts.hour, opts.min, opts.sec,
                          opts.ms, opts.delta_frames)
     elif opts.subtitle_type in ('ass', 'ssa'):
         newsub = AssSub(in_file, out_file, opts.unsafe_time_mode)
-        opt_err = Template(
-            'options $what not available with ass/ssa subtitles\n')
         if opts.range != ':':
             save_on_error(in_file, out_file, tmpfile)
-            parser.error(opt_err.substitute(what='-r/--range'))
+            parser.error(opt_err.substitute(
+                subtype='SubStation Alpha', what='-r/--range'))
         if opts.num:
             save_on_error(in_file, out_file, tmpfile)
-            parser.error(opt_err.substitute(what='-n/--num'))
+            parser.error(opt_err.substitute(
+                subtype='SubStation Alpha', what='-n/--num'))
         if opts.unsafe_number_mode:
             save_on_error(in_file, out_file, tmpfile)
-            parser.error(opt_err.substitute(what='-B/--back-to-the-block'))
-        #newsub = AssSub(in_file, out_file, opts.unsafe_time_mode)
+            parser.error(opt_err.substitute(
+                subtype='SubStation Alpha', what='-B/--back-to-the-block'))
         newsub.set_delta(opts.hour, opts.min, opts.sec, opts.ms, opts.num)
     newsub.IS_WARN = opts.is_warn
     try:
         newsub.main()
-    except (BadFormatError, MismatchTimeError, IndexNumError) as e:
+    except (BadFormatError, MismatchTimeError,
+            IndexNumError, UnicodeDecodeError) as e:
         save_on_error(in_file, out_file, tmpfile)
-        sys.stderr.write("%s: [at line %d] %s\n"
-             % (e.__class__.__name__, newsub.actual_numline, str(e)))
-        sys.exit(1)
-    except UnicodeDecodeError as e:
-        save_on_error(in_file, out_file, tmpfile)
-        sys.stderr.write("%s: [at line %d] %s\n"
-             % (e.__class__.__name__, newsub.actual_numline, str(e)))
+        print("{err}: [at line {line}] {msg}\n".format(
+            err=e.__class__.__name__, line=newsub.actual_numline, msg=str(e)),
+              file=sys.stderr)
         sys.exit(1)
     except Exception as e:
         save_on_error(in_file, out_file, tmpfile)
-        ue_msg = "\nUnknow error! surely a bug. Shit!\nException is"
-        sys.stderr.write("%s: [at line %d] %s\n\n"
-                         % (ue_msg, newsub.actual_numline, str(e)))
+        ue_msg = "Unknow error! surely a bug. Shit!\n[at line {line}] {msg}\n"
+        print(ue_msg.format(line=newsub.actual_numline, msg=str(e)),
+              file=sys.stderr)
         sys.exit(255)
-    close_files((in_file, out_file))
+    else:
+        close_files((in_file, out_file))

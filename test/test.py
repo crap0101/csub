@@ -577,13 +577,18 @@ class MiscTest (unittest.TestCase):
        files = [op.join(CWD, DATA_DIR, f) for f in _f]
        enc = 'us-ascii'
        for file in files:
-           with open(file, encoding=enc) as fin:
-               with tempfile.NamedTemporaryFile() as _fout:
-                   _out = _fout.name
-               with open(_out, mode='w', encoding=enc) as fout:
-                   inst = csub.SrtSub(fin, fout)
-                   self.assertRaises(UnicodeDecodeError, inst.main)
-                   
+           for err in ('strict', 'replace', 'ignore'):
+               with open(file, encoding=enc, errors=err) as fin:
+                   with tempfile.NamedTemporaryFile() as _fout:
+                       _out = _fout.name
+                   with open(_out, mode='w', encoding=enc, errors=err) as fout:
+                       inst = csub.SrtSub(fin, fout)
+                       if err == 'strict':
+                           self.assertRaises(UnicodeDecodeError, inst.main)
+                       else:
+                           with open(file, 'rb') as fin, open(_out, 'rb') as fout:
+                               self.assertNotEqual(fin.read(), fout.read())
+                               
     def testLookupEncoding(self):
         fake_encs = ['us-asciiuga', 'utf-otto', 'foo-far-baz']
         files = glob.glob(op.join(CWD, DATA_DIR, '_enc_*.srt'))
