@@ -55,10 +55,18 @@ def close_files(files):
     for file in files:
         if not file.isatty() or not file.closed:
             file.close()
-            
-def save_on_error(infile, outfile, tmpfile):
-    tmpfile.write_back()
-    close_files((in_file, out_file, tmpfile))
+
+
+def iterdec (multicall=False):
+    """Decorator used on the line's ckeck methods. """
+    def _iterdec1 (function):
+        def _iterdec2 (*args, **kwords):
+            res = function(*args, **kwords)
+            if multicall and res:
+                return res, False
+            return res, True
+        return _iterdec2
+    return _iterdec1
 
 def numslice(n, i, keep_sign=False):
     '''
@@ -75,18 +83,13 @@ def numslice(n, i, keep_sign=False):
     m, g = ((b-i), 0) if i > 0 else (abs(i), 1)
     return sign_op(divmod(n, 10**m)[g]) if keep_sign else divmod(n, 10**m)[g]
 
+def save_on_error(infile, outfile, tmpfile):
+    tmpfile.write_back()
+    close_files((in_file, out_file, tmpfile))
 
-def iterdec (multicall=False):
-    """Decorator used on the line's ckeck methods. """
-    def _iterdec1 (function):
-        def _iterdec2 (*args, **kwords):
-            res = function(*args, **kwords)
-            if multicall and res:
-                return res, False
-            return res, True
-        return _iterdec2
-    return _iterdec1
-
+def skip_bytes(stream, nbytes):
+    """Read nbytes from stream and return them."""
+    return stream.read(nbytes)
 
 def TempFileManager (methods):
     """Decorator for temp files. """
@@ -116,8 +119,9 @@ def get_parser():
                            metavar="TYPE", help="subtitle file type: (ass|ssa,"
                            " srt, sub|microdvd).")
     io_parser.add_argument("-e", "--encoding", dest="encoding", metavar="NAME",
-                           default='utf-8', help="subtitle encoding to use;"
-                           " must match the input file's encoding.")
+                           default='utf-8', help="subtitle encoding to use for"
+                           " reading and writing files. Must match the input "
+                           "file's encoding (default to utf-8).")
     io_parser.add_argument("-E", "--encode-error", dest='enc_err',
                            default='strict', metavar="NAME",
                            choices=('strict', 'replace', 'ignore'),
@@ -127,7 +131,9 @@ def get_parser():
                            " ignore errors (Note that ignoring encoding errors"
                            " can lead to data loss) or 'replace' to insert a"
                            " replacement marker (such as '?') where there is"
-                           " malformed data.")
+                           " malformed data. Default to 'strict'.")
+    io_parser.add_argument("-s", "--skip-bytes", dest="skip_bytes", type=int,
+                           metavar="NUM", help="skip the first NUM file's bytes.")
     s_parser = parser.add_argument_group('Subtitle Options')
     s_parser.add_argument("-f", "--delta-frames", type=int, default=0,
                           dest="delta_frames", metavar="NUMBER",
@@ -217,7 +223,7 @@ class MismatchTimeError (BadFormatError):
     """Raised when a malformed time is found. """
 
     def __init__ (self, message):
-        super(MismatchTimeError, self).__init__()
+        super().__init__()
         self.message = message
 
     def __str__ (self):
@@ -228,7 +234,7 @@ class IndexNumError (BadFormatError):
     """Raised when a malformed subs identifier is found. """
 
     def __init__ (self, message):
-        super(IndexNumError, self).__init__()
+        super().__init__()
         self.message = message
 
     def __str__ (self):
@@ -239,7 +245,7 @@ class IncompleteBlockError (Warning):
     """Raised for incomplete block at the EOF (e.g. no newline). """
 
     def __init__ (self, message):
-        super(IncompleteBlockError, self).__init__()
+        super().__init__()
         self.message = message
 
     def __str__ (self):
@@ -560,7 +566,9 @@ if __name__ == '__main__':
     try:
         codecs.lookup(opts.encoding.lower())
     except LookupError as le:
-        parser.error(str(le))
+        print('{prog}: {err}'.format(prog=sys.argv[0], err=le),
+              file=sys.stderr)
+        sys.exit(1)
     if not opts.subtitle_type:
         parser.error("subtitle type (-t/--type) must be specified!")
     if opts.infile and not os.path.isfile(opts.infile):
@@ -578,6 +586,8 @@ if __name__ == '__main__':
         if opts.outfile:
             out_file = open(opts.outfile, "w",
                             encoding=opts.encoding, errors=opts.enc_err)
+    if opts.skip_bytes:
+        skip_bytes(in_file, opts.skip_bytes)
     if opts.subtitle_type == 'srt':
         newsub = SrtSub(in_file, out_file,
                         opts.unsafe_time_mode, opts.unsafe_number_mode)
@@ -625,6 +635,11 @@ if __name__ == '__main__':
     try:
         newsub.main()
     except (BadFormatError, MismatchTimeError, IndexNumError) as e:
+        save_on_error(in_file, out_file, tmpfile)
+        sys.stderr.write("%s: [at line %d] %s\n"
+             % (e.__class__.__name__, newsub.actual_numline, str(e)))
+        sys.exit(1)
+    except UnicodeDecodeError as e:
         save_on_error(in_file, out_file, tmpfile)
         sys.stderr.write("%s: [at line %d] %s\n"
              % (e.__class__.__name__, newsub.actual_numline, str(e)))

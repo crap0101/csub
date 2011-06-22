@@ -21,8 +21,10 @@ import subprocess as sbp
 import shlex
 import operator
 import platform
+import tempfile
 
-    
+
+PYTHON_EXE = 'python3'
 PROGFILE = 'csub.py'
 DATA_DIR = 'data'
 CWD = op.dirname(op.realpath(__file__))
@@ -71,12 +73,12 @@ class TempFileTest (unittest.TestCase):
                 newsub.main()
 
     def testCmdlineOnFailSrt (self):
-        commands = ["python3 {prog} -i %{input} -o {output}",
-                    "python3 {prog} -i %{input} -o {output} -t ass",
-                    "python3 {prog} -i %{input} -o {output} -t srt -H foo",
-                    "python3 {prog} -i %{input} -o {output} -t srt --not-exist",
-                    "python3 {prog} -i %{input} -o {output} -t srt -m 9999",]
-        cmd_dict = {'input':None,'output':None, 'prog':PROGFILE}
+        commands = ["{exe} {prog} -i {input} -o {output}",
+                    "{exe} {prog} -i __FAIL__{input} -o {output} -t ass",
+                    "{exe} {prog} -i {input} -o {output} -t srt -H foo",
+                    "{exe} {prog} -i {input} -o {output} -t srt --not-exist",
+                    "{exe} {prog} -i {input} -o {output} -t srt -m 9999",]
+        cmd_dict = {'exe':PYTHON_EXE, 'input':None,'output':None, 'prog':PROGFILE}
         for subfile in itertools.chain(
             glob.glob(op.join(CWD, DATA_DIR, 'test*.srt'))):
             with open(subfile) as f:
@@ -96,12 +98,12 @@ class TempFileTest (unittest.TestCase):
                                      "sub file shouldn't be modified!")
 
     def testCmdlineOnFailAss (self):
-        commands = ["python3 {prog} -i %{input} -o {output}",
-                    "python3 {prog} -i %{input} -o {output} -t srt",
-                    "python3 {prog} -i %{input} -o {output} -t sub -r 1:2",
-                    "python3 {prog} -i %{input} -o {output} -t ass -n 11",
-                    "python3 {prog} -i %{input} -o {output} -t ass -B",]
-        cmd_dict = {'input':None,'output':None, 'prog':PROGFILE}
+        commands = ["{exe} {prog} -i {input} -o {output}",
+                    "{exe} {prog} -i {input} -o {output} -t srt",
+                    "{exe} {prog} -i {input} -o {output} -t sub -r 1:2",
+                    "{exe} {prog} -i {input} -o {output} -t ass -n 11",
+                    "{exe} {prog} -i {input} -o {output} -t ass -B",]
+        cmd_dict = {'exe':PYTHON_EXE, 'input':None,'output':None, 'prog':PROGFILE}
         for subfile in itertools.chain(
             glob.glob(op.join(CWD, DATA_DIR, 'test*.sub'))):
             with open(subfile) as f:
@@ -121,15 +123,15 @@ class TempFileTest (unittest.TestCase):
                                      "sub file shouldn't be modified!")
 
     def testCmdlineOnFailMicroDVD (self):
-        commands = ["python3 {prog} -i %{input} -o {output}",
-                    "python3 {prog} -i %{input} -o {output} -t srt",
-                    "python3 {prog} -i %{input} -o {output} -t sub -f foo",
-                    "python3 {prog} -i %{input} -o {output} -t sub -F",
-                    "python3 {prog} -i %{input} -o {output} -t sub -f",
-                    "python3 {prog} -i %{input} -o {output} -t sub -r 1:2",
-                    "python3 {prog} -i %{input} -o {output} -t sub -n 11",
-                    "python3 {prog} -i %{input} -o {output} -t sub -B",]
-        cmd_dict = {'input':None,'output':None, 'prog':PROGFILE}
+        commands = ["{exe} {prog} -i {input} -o {output}",
+                    "{exe} {prog} -i {input} -o {output} -t srt",
+                    "{exe} {prog} -i {input} -o {output} -t sub -f foo",
+                    "{exe} {prog} -i {input} -o {output} -t sub -F",
+                    "{exe} {prog} -i {input} -o {output} -t sub -f",
+                    "{exe} {prog} -i {input} -o {output} -t sub -r 1:2",
+                    "{exe} {prog} -i {input} -o {output} -t sub -n 11",
+                    "{exe} {prog} -i {input} -o {output} -t sub -B",]
+        cmd_dict = {'exe':PYTHON_EXE, 'input':None,'output':None, 'prog':PROGFILE}
         for subfile in itertools.chain(
             glob.glob(op.join(CWD, DATA_DIR, 'test*.ass'))):
             with open(subfile) as f:
@@ -255,7 +257,7 @@ class SrtFileTest (unittest.TestCase):
             self.skipTest('actually not available on Windows platform')
         options = ["-H", "-M", "-S", "-m", "-n"]
         lenopt = len(options)
-        cmdline = ["python3", PROGFILE]
+        cmdline = [PYTHON_EXE, PROGFILE]
         for sub in (SRT_FAKESUB_0, SRT_FAKESUB_1, SRT_FAKESUB_2):
             choosed = cmdline[:]
             back_to = cmdline[:]
@@ -293,7 +295,7 @@ class SrtFileTest (unittest.TestCase):
                      SRT_FAKESUB_8_FAIL_INDEX,SRT_FAKESUB_9_FAIL_INDEX, 
                      SRT_FAKESUB_3_FAIL_TIME, SRT_FAKESUB_4_FAIL_TIME, 
                      SRT_FAKESUB_5_FAIL_TIME, SRT_FAKESUB_6_FAIL_TIME,]
-        cmdline = ["python3", PROGFILE]
+        cmdline = [PYTHON_EXE, PROGFILE]
         cmdline.append('%s srt' %
                        ('-t' if random.randint(0,1) else '--type'))
         cmdline = shlex.split(' '.join(cmdline))
@@ -543,11 +545,74 @@ class AssFileTest (unittest.TestCase):
         self.assertEqual(sub_in.read(), sub_out.read())        
 
 
+class MiscTest (unittest.TestCase):
+    def testSkip(self):
+        _r = random.randint
+        for file in glob.glob(op.join(CWD, DATA_DIR, '[a-z]*.srt')):
+            for mode in ('r','rb'):
+                with open(file, mode=mode) as sub:
+                    bytes = _r(0, len(sub.read())-1)
+                    sub.seek(0)
+                    readed = csub.skip_bytes(sub, bytes)
+                    self.assertEqual(len(readed), bytes)
+                    sub.seek(0)
+                    self.assertEqual(readed, sub.read(bytes))
+
+    def testGoodEncoding(self):
+        files = glob.glob(op.join(CWD, DATA_DIR, '_enc_*.srt'))
+        for file in files:
+            enc = re.match('_enc_([-\w]+)\..*$', op.basename(file)).group(1)
+            with open(file, encoding=enc) as fin:
+                with tempfile.NamedTemporaryFile() as _fout:
+                    _out = _fout.name
+                with open(_out, mode='w', encoding=enc) as fout:
+                    inst = csub.SrtSub(fin, fout)
+                    inst.main()
+            with open(file, 'rb') as fin_t:
+                with open(_out, 'rb') as fout_t:
+                    self.assertEqual(fin_t.read(), fout_t.read())
+
+    def testFailEncoding(self):
+       _f = ['_enc_ISO-8859-15.srt', '_enc_utf-8.srt']
+       files = [op.join(CWD, DATA_DIR, f) for f in _f]
+       enc = 'us-ascii'
+       for file in files:
+           with open(file, encoding=enc) as fin:
+               with tempfile.NamedTemporaryFile() as _fout:
+                   _out = _fout.name
+               with open(_out, mode='w', encoding=enc) as fout:
+                   inst = csub.SrtSub(fin, fout)
+                   self.assertRaises(UnicodeDecodeError, inst.main)
+                   
+    def testLookupEncoding(self):
+        fake_encs = ['us-asciiuga', 'utf-otto', 'foo-far-baz']
+        files = glob.glob(op.join(CWD, DATA_DIR, '_enc_*.srt'))
+        cmdline = "{exe} {prog} -i {fin} -o {fout} -t srt -e {enc}"
+        cmd_dict = {'exe':PYTHON_EXE, 'prog':PROGFILE, 'enc':None,}
+        for file in files:
+            enc = re.match('_enc_([-\w]+)\..*$', op.basename(file)).group(1)
+            cmd_dict['enc'] = enc
+            cmd_dict['fin'] = file
+            with tempfile.NamedTemporaryFile() as fout:
+                cmd_dict['fout'] = fout.name
+            cmd = shlex.split(cmdline.format(**cmd_dict))
+            pipe = sbp.Popen(cmd, stdout=sbp.PIPE, stderr=sbp.PIPE)
+            pipe.communicate()
+            self.assertEqual(pipe.returncode, 0)
+        for enc in fake_encs:
+            cmd_dict['enc'] = enc
+            cmd = shlex.split(cmdline.format(**cmd_dict))
+            pipe = sbp.Popen(cmd, stdout=sbp.PIPE, stderr=sbp.PIPE)
+            pipe.communicate()
+            self.assertNotEqual(pipe.returncode, 0)
+
+
+
 def load_tests():
     loader = unittest.TestLoader()
-    test_cases = (SrtFileTest, SrtReTest,
-                  SrtTimeTransformTest, TempFileTest,
-                  AssFileTest, MicroDVDFIleTest)
+    test_cases = (SrtFileTest, SrtReTest, SrtTimeTransformTest,
+                  TempFileTest, AssFileTest, MicroDVDFIleTest,
+                  MiscTest)
     return (loader.loadTestsFromTestCase(t) for t in test_cases)
 
 

@@ -1,2 +1,25 @@
 42
 -10:27:02,460 --> 00:27:04,480
+
+3
+00:00:39,527 --> 00:00:42,228
+<i>6 anni fa la NASA scopri' la probabilita'</i>
+
+4
+00:00:42,334 --> 00:00:45,230
+<i>di vita aliena nel nostro sistema solare.</i>
+
+5
+00:00:48,909 --> 00:00:51,234
+<i>Fu lanciata una sonda spaziale
+per raccogliere campioni,</i>
+
+6
+00:00:52,165 --> 00:00:55,236
+<i>ma fini' in pezzi durante
+il rientro, sopra il Messico.</i>
+
+7
+00:00:58,754 --> 00:01:02,240
+<i>Poco dopo comparvero
+nuove forme di vita</i>
