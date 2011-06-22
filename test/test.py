@@ -256,7 +256,7 @@ class SrtFileTest (unittest.TestCase):
         options = ["-H", "-M", "-S", "-m", "-n"]
         lenopt = len(options)
         cmdline = ["python3", PROGFILE]
-        for sub in (SRT_FAKESUB_1, SRT_FAKESUB_1, SRT_FAKESUB_2):
+        for sub in (SRT_FAKESUB_0, SRT_FAKESUB_1, SRT_FAKESUB_2):
             choosed = cmdline[:]
             back_to = cmdline[:]
             opts = options[:]

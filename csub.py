@@ -42,8 +42,9 @@ import math
 import operator
 import itertools
 import warnings
+import argparse
+import codecs
 from tempfile import mkstemp
-from optparse import OptionParser, OptionValueError
 from string import Template
 
 #####################
@@ -75,13 +76,6 @@ def numslice(n, i, keep_sign=False):
     return sign_op(divmod(n, 10**m)[g]) if keep_sign else divmod(n, 10**m)[g]
 
 
-def check_ms (option, opt_str, value, parser, **kwords):
-    if not (-999 <= value <= 999):
-        raise OptionValueError("option `%s` must be in range -999..999"
-                               % (opt_str,))
-    setattr(parser.values, kwords['opt_dest'], value)
-
-
 def iterdec (multicall=False):
     """Decorator used on the line's ckeck methods. """
     def _iterdec1 (function):
@@ -108,6 +102,73 @@ def TempFileManager (methods):
         return inner2
     return inner1
 
+
+def get_parser():
+    parser = argparse.ArgumentParser(version="csub %s" % VERSION)
+    parser.add_argument("--info", dest="info", action="store_true",
+                        help="print informations about the program and exit.")
+    io_parser = parser.add_argument_group('Input and Output')
+    io_parser.add_argument("-i", "--input-file", dest="infile", metavar="FILE",
+                           help="read the subtitle from FILE (default: stdin).")
+    io_parser.add_argument("-o", "--output-file", dest="outfile", metavar="FILE",
+                           help="write the subtitle in FILE (default: stdout).")
+    io_parser.add_argument("-t", "--type", dest="subtitle_type",
+                           metavar="TYPE", help="subtitle file type: (ass|ssa,"
+                           " srt, sub|microdvd).")
+    io_parser.add_argument("-e", "--encoding", dest="encoding", metavar="NAME",
+                           default='utf-8', help="subtitle encoding to use;"
+                           " must match the input file's encoding.")
+    io_parser.add_argument("-E", "--encode-error", dest='enc_err',
+                           default='strict', metavar="NAME",
+                           choices=('strict', 'replace', 'ignore'),
+                           help="specifies how encoding and decoding errors"
+                           " are to be handled. Pass 'strict' to raise an"
+                           " error if there is an encoding error, 'ignore' to"
+                           " ignore errors (Note that ignoring encoding errors"
+                           " can lead to data loss) or 'replace' to insert a"
+                           " replacement marker (such as '?') where there is"
+                           " malformed data.")
+    s_parser = parser.add_argument_group('Subtitle Options')
+    s_parser.add_argument("-f", "--delta-frames", type=int, default=0,
+                          dest="delta_frames", metavar="NUMBER",
+                          help="change the frames values by NUMBER"
+                          " (only for microDVD).")
+    s_parser.add_argument("-F", "--frames", type=int, default=25,
+                          dest="frames", metavar="NUMBER",
+                          help="the movie's frame rate (eg. 25, 29.97, 23.976)"
+                          " (default: 25. Only for microDVD).")
+    s_parser.add_argument("-S", "--seconds", type=int,
+                          default=0, dest="sec", metavar="NUMBER",
+                          help="change the seconds values by NUMBER.")
+    s_parser.add_argument("-M", "--minutes", type=int,
+                          dest="min", default=0, metavar="NUMBER",
+                          help="change the minutes values by NUMBER.")
+    s_parser.add_argument("-H", "--hours", type=int,
+                          dest="hour", default=0, metavar="NUMBER",
+                          help="change the hours values by NUMBER.")
+    s_parser.add_argument("-m", "--milliseconds", dest="ms", default=0,
+                          metavar="NUMBER", choices=range(-999, 1000), type=int,
+                          help="change the milliseconds values by NUMBER. "
+                          "(NOTE: this value must be in range -999..999).")
+    s_parser.add_argument("-n", "--num", type=int, dest="num",
+                          default=0, metavar="NUMBER",
+                          help="change the progressive subtitle number by"
+                          " NUMBER. (only for srt, ignored with ass/ssa subs).")
+    s_parser.add_argument("-r", "--range", dest="range", default=':',
+                          metavar="START:END", help="apply changes only for subs"
+                          " between START and END (excluded). (only for srt).")
+    m_parser = parser.add_argument_group('Misc Options')
+    m_parser.add_argument("-b", "--back-to-the-future", action="store_true",
+                          dest="unsafe_time_mode", default=False,
+                          help="unsafe time mode. Don't get any errors if "
+                          " timecode become negative.")
+    m_parser.add_argument("-B", "--back-to-the-block", action="store_true",
+                          dest="unsafe_number_mode", default=False,
+                          help="unsafe number mode. Don't get any errors if "
+                          "sub's numbers became negative.  (only for srt).")
+    m_parser.add_argument("-w", "--warn", action="store_true", dest="is_warn",
+                          default=False, help="enable warnings.")
+    return parser
 
 #################
 # C L A S S E S #
@@ -491,81 +552,32 @@ if __name__ == '__main__':
     in_file = sys.stdin 
     out_file = sys.stdout
     tmpfile = TempFile(None)
-
-    parser = OptionParser(version="csub %s" % VERSION)
-    parser.add_option("--info", dest="info", action="store_true",
-                      help="print informations about the program and exit.")
-    parser.add_option("-t", "--type",type="string",
-                      dest="subtitle_type", metavar="TYPE",
-                      help="subtitle file type: (ass|ssa, srt, sub|microdvd).")
-    parser.add_option("-o", "--output-file",type="string",
-                      dest="outfile", metavar="FILE",
-                      help="write the subtitle in FILE (default: stdout).")
-    parser.add_option("-i", "--input-file", type="string",
-                      dest="infile", metavar="FILE",
-                      help="read the subtitle from FILE (default: stdin).")
-    parser.add_option("-f", "--delta-frames", type="int",
-                      default=0, dest="delta_frames", metavar="NUMBER",
-                      help="change the frames values by NUMBER "
-                      "(only for microDVD).")
-    parser.add_option("-F", "--frames", type="int",
-                      default=25, dest="frames", metavar="NUMBER",
-                      help="the movie's frame rate (eg. 25, 29.97, 23.976) "
-                      "(default: 25. Only for microDVD).")
-    parser.add_option("-S", "--seconds", type="int",
-                      default=0, dest="sec", metavar="NUMBER",
-                      help="change the seconds values by NUMBER.")
-    parser.add_option("-M", "--minutes", type="int",
-                      dest="min", default=0, metavar="NUMBER",
-                      help="change the minutes values by NUMBER.")
-    parser.add_option("-H", "--hours", type="int",
-                      dest="hour", default=0, metavar="NUMBER",
-                      help="change the hours values by NUMBER.")
-    parser.add_option("-m", "--milliseconds", type="int", action="callback",
-                      callback_kwargs={'opt_dest':"ms",}, callback=check_ms,
-                      metavar="NUMBER", dest="ms", default=0,
-                      help="change the milliseconds values by NUMBER. "
-                      "(NOTE: this value must be in range -999..999).")
-    parser.add_option("-n", "--num", type="int", dest="num",
-                      default=0, metavar="NUMBER",
-                      help="change the progressive subtitle number by NUMBER."
-                      " (only for srt, ignored with ass/ssa subs).")
-    parser.add_option("-r", "--range", type="str",
-                      dest="range", default=':', metavar="START:END",
-                      help="apply changes only for subs between START"
-                      " and END (excluded). (only for srt).")
-    parser.add_option("-b", "--back-to-the-future", action="store_true",
-                      dest="unsafe_time_mode", default=False,
-                      help="unsafe time mode. Don't get any errors if "
-                      " timecode become negative.")
-    parser.add_option("-B", "--back-to-the-block", action="store_true",
-                      dest="unsafe_number_mode", default=False,
-                      help="unsafe number mode. Don't get any errors if "
-                      "sub's numbers became negative.  (only for srt).")
-    parser.add_option("-w", "--warn", action="store_true", dest="is_warn",
-                      default=False, help="enable warnings.")
-
-    opts, args = parser.parse_args()
+    parser = get_parser()
+    opts = parser.parse_args()
     if opts.info:
         print(__doc__)
         sys.exit(0)
-    if args:
-         parser.error("Error: unknown argument(s) %s" % args)
+    try:
+        codecs.lookup(opts.encoding.lower())
+    except LookupError as le:
+        parser.error(str(le))
     if not opts.subtitle_type:
         parser.error("subtitle type (-t/--type) must be specified!")
     if opts.infile and not os.path.isfile(opts.infile):
         parser.error("invalid input file '%s'" % opts.infile)
-    #if opts.outfile and not os.path.isfile(opts.outfile):
-    #    parser.error("invalid output file '%s'" % opts.outfile)
     if opts.infile == opts.outfile and all((opts.infile, opts.outfile)):
         tmpfile = TempFile(opts.infile)
-        in_file = open(tmpfile.filepath, 'r')
-        out_file = open(opts.infile, 'w')
+        in_file = open(tmpfile.filepath, 'r',
+                       encoding=opts.encoding, errors=opts.enc_err)
+        out_file = open(opts.infile, 'w',
+                        encoding=opts.encoding, errors=opts.enc_err)
     else:
         if opts.infile:
-            in_file = open(opts.infile, "r")
+            in_file = open(opts.infile, "r",
+                           encoding=opts.encoding, errors=opts.enc_err)
         if opts.outfile:
-            out_file = open(opts.outfile, "w")
+            out_file = open(opts.outfile, "w",
+                            encoding=opts.encoding, errors=opts.enc_err)
     if opts.subtitle_type == 'srt':
         newsub = SrtSub(in_file, out_file,
                         opts.unsafe_time_mode, opts.unsafe_number_mode)
