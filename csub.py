@@ -16,14 +16,17 @@ VERSION = '1.2_20110622'
 # GNU General Public License for more details.
 # You should have received a copy of the GNU General Public License
 # along with this program; if not see <http://www.gnu.org/licenses/>
-# or write to the Free Software Foundation, Inc., 
-# 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.    
+# or write to the Free Software Foundation, Inc.,
+# 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+Requirements:
+  - Python >= 3
 
 Supported formats:
   - SubRip (*.srt)
   - (Advanced) SubStation Alpha (*.ass, *.ssa)
   - MicroDVD (*.sub)
-  
+
 Examples:
   # reading from stdin and output to stdout ans ass/ssa sub:
   ~$ ./prog_name --minutes 3 --seconds -44 --milliseconds -378 -num 2 -t ass
@@ -247,7 +250,7 @@ class IncompleteBlockError (Warning):
         self.message = message
     def __str__ (self):
         return self.message
-    
+
 
 class GetFunc:
     """Help class to iterate over the line's check methods."""
@@ -294,7 +297,7 @@ class Subtitle:
         def is_edit(number):
             return number >= start and number < stop
         return is_edit
-    
+
     def set_delta (self, hour=0, min_=0, sec=0, ms=0, sub_number=0):
         """Set time's attribute."""
         self.delta_hour = hour
@@ -400,7 +403,7 @@ class MicroDVD (Subtitle):
 
     def _new_time(self, frames):
         return list(self.frame_use_secs(f) for f in frames)
-                                  
+
     def _new_frames(self, frames):
         return list(x + self.delta_frames for x in frames)
 
@@ -454,7 +457,7 @@ class AssSub (Subtitle):
         # *MAX_MS* is used as an alias for *MAX_HNDRS* and *self.delta_ms*
         # used in various methods of the base class refer to hundreds, not
         # milliseconds (to avoid rewrite methos in the base class).
-        
+
     def new_time(self, time_string, sec_sep):
         """Return a string representing the the subtitle time."""
         h, m, s, hndrs = list(map(
@@ -484,19 +487,19 @@ class AssSub (Subtitle):
             except AttributeError as err:
                 raise MismatchTimeError(
                     "You probably need to --back-to-the-future\n"
-                    "ERR LINE IS: %s" % line)            
+                    "ERR LINE IS: %s" % line)
         return line
 
     def set_delta(self, hour=0, min_=0, sec=0, hndrs=0, *not_used):
         super(AssSub, self).set_delta(hour, min_, sec)
         self.delta_ms = hndrs
-    
+
     def main (self):
         for self.actual_numline, line in zip(
             itertools.count(1), self.file_in):
             self.file_out.write("%s\n" % self.parse_line(line))
 
-        
+
 class SrtSub (Subtitle):
     """
     Class to manage SubRip (*.srt) subtitle.
@@ -563,7 +566,7 @@ class SrtSub (Subtitle):
 ###########
 
 if __name__ == '__main__':
-    in_file = sys.stdin 
+    in_file = sys.stdin
     out_file = sys.stdout
     tmpfile = TempFile(None)
     opt_err = Template('options $what not available with $subtype subtitles\n')
