@@ -603,9 +603,13 @@ if __name__ == '__main__':
     if opts.subtitle_type == 'srt':
         newsub = SrtSub(in_file, out_file,
                         opts.unsafe_time_mode, opts.unsafe_number_mode)
-        start_sub, end_sub = opts.range.split(':')
-        newsub.set_subs_range(int(start_sub) if start_sub else None,
-                              int(end_sub) if end_sub else None)
+        try:
+            start_sub, end_sub = opts.range.split(':')
+            newsub.set_subs_range(int(start_sub) if start_sub else None,
+                                  int(end_sub) if end_sub else None)
+        except ValueError as e:
+            save_on_error(in_file, out_file, tmpfile)
+            parser.error(str(e))
         newsub.set_delta(opts.hour, opts.min, opts.sec, opts.ms, opts.num)
     elif opts.subtitle_type in ('sub', 'microdvd'):
         use_secs = any((opts.hour, opts.min, opts.sec, opts.ms))
