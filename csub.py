@@ -57,9 +57,8 @@ from string import Template
 def close_files(files):
     """Close any file in *files* if not a tty or already closed."""
     for file in files:
-        if not file.isatty() or not file.closed:
+        if not file.isatty() and not file.closed:
             file.close()
-
 
 def iterdec (multicall=False):
     """Decorator used on the line's ckeck methods."""
@@ -186,7 +185,7 @@ def get_parser():
 # C L A S S E S #
 #################
 
-@TempFileManager(('close', 'isatty', 'read', 'seek', 'write_back'))
+@TempFileManager(('close', 'closed', 'isatty', 'read', 'seek', 'write_back'))
 class TempFile:
     """Class to manage temp file (using tmpfile's mkstemp)."""
     def __init__ (self, in_file, options=None):
@@ -199,11 +198,15 @@ class TempFile:
         with open(self.in_file, 'rb') as _in:
             self.fd_max_pos = os.write(self.fd, _in.read())
         self.seek(0, 0)
-        self.closed = False
+        self._closed = False
 
+    @property
+    def closed (self):
+        return self._closed
+    
     def close (self):
         os.close(self.fd)
-        self.closed = True
+        self._closed = True
 
     def isatty(self):
         return os.isatty(self.fd)
@@ -609,7 +612,8 @@ if __name__ == '__main__':
                                   int(end_sub) if end_sub else None)
         except ValueError as e:
             save_on_error(in_file, out_file, tmpfile)
-            parser.error(str(e))
+            parser.error('invalid -r/--range option: {val} [{err}]'.format(
+                val=opts.range, err=str(e)))
         newsub.set_delta(opts.hour, opts.min, opts.sec, opts.ms, opts.num)
     elif opts.subtitle_type in ('sub', 'microdvd'):
         use_secs = any((opts.hour, opts.min, opts.sec, opts.ms))
@@ -653,16 +657,20 @@ if __name__ == '__main__':
         newsub.main()
     except (BadFormatError, MismatchTimeError,
             IndexNumError, UnicodeDecodeError) as e:
-        save_on_error(in_file, out_file, tmpfile)
         print("{err}: [at line {line}] {msg}\n".format(
             err=e.__class__.__name__, line=newsub.actual_numline, msg=str(e)),
               file=sys.stderr)
+        save_on_error(in_file, out_file, tmpfile)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print('csub: User Interrupt')
+        save_on_error(in_file, out_file, tmpfile)
         sys.exit(1)
     except Exception as e:
-        save_on_error(in_file, out_file, tmpfile)
         ue_msg = "Unknow error! surely a bug. Shit!\n[at line {line}] {msg}\n"
         print(ue_msg.format(line=newsub.actual_numline, msg=str(e)),
               file=sys.stderr)
+        save_on_error(in_file, out_file, tmpfile)
         sys.exit(255)
     else:
         close_files((in_file, out_file))

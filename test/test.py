@@ -24,7 +24,7 @@ import platform
 import tempfile
 
 
-PYTHON_EXE = 'python3'
+PYTHON_EXE = sys.executable
 PROGFILE = 'csub.py'
 DATA_DIR = 'data'
 CWD = op.dirname(op.realpath(__file__))
@@ -74,6 +74,8 @@ class TempFileTest (unittest.TestCase):
 
     def testCmdlineOnFailSrt (self):
         commands = ["{exe} {prog} -i {input} -o {output}",
+                    "{exe} {prog} -i {input} -o {output} -r 1:foo",
+                    "{exe} {prog} -i {input} -o {output} -r 3",
                     "{exe} {prog} -i __FAIL__{input} -o {output} -t ass",
                     "{exe} {prog} -i {input} -o {output} -t srt -H foo",
                     "{exe} {prog} -i {input} -o {output} -t srt --not-exist",
