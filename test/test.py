@@ -250,7 +250,7 @@ class MicroDVDFIleTest (unittest.TestCase):
             outfile.seek(0)
             self.assertNotEqual(infile.read(), outfile.read())
             
-                                
+        
 class SrtFileTest (unittest.TestCase):
     """Test operation on files. """
 
@@ -548,17 +548,28 @@ class AssFileTest (unittest.TestCase):
 
 
 class MiscTest (unittest.TestCase):
+    def testClose(self):
+        to_close = [open(file) for file in
+                    glob.glob(op.join(CWD, DATA_DIR, '[a-z]*.srt'))]
+        no_close = [sys.stdin, sys.stdout, sys.stderr]
+        csub.close_files(to_close)
+        for file in to_close:
+            self.assertTrue(file.closed)
+        csub.close_files(no_close)
+        for file in no_close:
+            self.assertFalse(file.closed)
+
     def testSkip(self):
         _r = random.randint
         for file in glob.glob(op.join(CWD, DATA_DIR, '[a-z]*.srt')):
             for mode in ('r','rb'):
                 with open(file, mode=mode) as sub:
-                    bytes = _r(0, len(sub.read())-1)
+                    _bytes = _r(0, len(sub.read())-1)
                     sub.seek(0)
-                    readed = csub.skip_bytes(sub, bytes)
-                    self.assertEqual(len(readed), bytes)
+                    readed = csub.skip_bytes(sub, _bytes)
+                    self.assertEqual(len(readed), _bytes)
                     sub.seek(0)
-                    self.assertEqual(readed, sub.read(bytes))
+                    self.assertEqual(readed, sub.read(_bytes))
 
     def testGoodEncoding(self):
         files = glob.glob(op.join(CWD, DATA_DIR, '_enc_*.srt'))

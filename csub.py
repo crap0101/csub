@@ -164,10 +164,13 @@ def get_parser():
     s_parser.add_argument("-n", "--num", type=int, dest="num",
                           default=0, metavar="NUMBER",
                           help="change the progressive subtitle number by"
-                          " NUMBER. (only for srt, ignored with ass/ssa subs).")
+                          " NUMBER. (only for srt, raise an error if used"
+                          " with microDVD or ass/ssa subtitles).")
     s_parser.add_argument("-r", "--range", dest="range", default=':',
-                          metavar="START:END", help="apply changes only for subs"
-                          " between START and END (excluded). (only for srt).")
+                          metavar="START:END", help="apply changes only for"
+                          " subs between START and END (excluded)."
+                          " (only for srt, raise an error if used with ass/ssa"
+                          " or microDVD subtitles).")
     m_parser = parser.add_argument_group('Misc Options')
     m_parser.add_argument("-b", "--back-to-the-future", action="store_true",
                           dest="unsafe_time_mode", default=False,
