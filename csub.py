@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-VERSION = '1.2_20110622'
+VERSION = '1.2_20110916'
 
 """csub {0} - utility to synchronize subtitle files
 
@@ -115,6 +115,7 @@ def get_parser():
     parser = argparse.ArgumentParser(version="csub %s" % VERSION)
     parser.add_argument("--info", dest="info", action="store_true",
                         help="print informations about the program and exit.")
+    # I/O options
     io_parser = parser.add_argument_group('Input and Output')
     io_parser.add_argument("-i", "--input-file", dest="infile", metavar="FILE",
                            help="read the subtitle from FILE (default: stdin).")
@@ -139,15 +140,13 @@ def get_parser():
                            " malformed data. Default to 'strict'.")
     io_parser.add_argument("-s", "--skip-bytes", dest="skip_bytes", type=int,
                            metavar="NUM", help="skip the first NUM file's bytes.")
+    # subtiles options
     s_parser = parser.add_argument_group('Subtitle Options')
-    s_parser.add_argument("-f", "--delta-frames", type=int, default=0,
-                          dest="delta_frames", metavar="NUMBER",
-                          help="change the frames values by NUMBER"
-                          " (only for microDVD).")
-    s_parser.add_argument("-F", "--frames", type=int, default=25,
-                          dest="frames", metavar="NUMBER",
-                          help="the movie's frame rate (eg. 25, 29.97, 23.976)"
-                          " (default: 25. Only for microDVD).")
+    srt_parser = parser.add_argument_group('Subrip (*.srt) Specific Options')
+    ass_parser = parser.add_argument_group(
+        '(Advanced) SubStation Alpha (*.ass, *.ssa) Specific Options')
+    mdvd_parser = parser.add_argument_group('MicoDVD (*.sub) Specific Options')
+    ## all subtitles
     s_parser.add_argument("-S", "--seconds", type=int,
                           default=0, dest="sec", metavar="NUMBER",
                           help="change the seconds values by NUMBER.")
@@ -161,25 +160,39 @@ def get_parser():
                           metavar="NUMBER", choices=range(-999, 1000), type=int,
                           help="change the milliseconds values by NUMBER. "
                           "(NOTE: this value must be in range -999..999).")
-    s_parser.add_argument("-n", "--num", type=int, dest="num",
-                          default=0, metavar="NUMBER",
-                          help="change the progressive subtitle number by"
-                          " NUMBER. (only for srt, raise an error if used"
-                          " with microDVD or ass/ssa subtitles).")
-    s_parser.add_argument("-r", "--range", dest="range", default=':',
-                          metavar="START:END", help="apply changes only for"
-                          " subs between START and END (excluded)."
-                          " (only for srt, raise an error if used with ass/ssa"
-                          " or microDVD subtitles).")
+    ## srt
+    srt_parser.add_argument("-n", "--num", type=int, dest="num", default=0,
+                            metavar="NUMBER",  help="change the progressive"
+                            " subtitle number by NUMBER.")
+    srt_parser.add_argument("-r", "--range", dest="range", default=':',
+                            metavar="START:END", help="apply changes only for"
+                            " subs between START and END (excluded).")
+    srt_parser.add_argument("-B", "--back-to-the-block", action="store_true",
+                            dest="unsafe_number_mode", default=False,
+                            help="unsafe number mode. Don't get any errors if "
+                            "sub's numbers became negative.")
+    srt_parser.add_argument("-I", "--ignore-extra", action="store_true",
+                            dest='ignore_extra', default=False,
+                            help='ignore extra informations in the time line'
+                            ' (like sub position, style, ecc. These informations'
+                            ' are extensions of the original subrip format, so'
+                            ' are normally treated as errors; you must use this'
+                            ' option for parsing such a subtitles. NOTE: Those'
+                            ' informations are not kept in the new file.')
+    ## microDVD
+    mdvd_parser.add_argument("-f", "--delta-frames", type=int, default=0,
+                             dest="delta_frames", metavar="NUMBER",
+                             help="change the frames values by NUMBER")
+    mdvd_parser.add_argument("-F", "--frames", type=int, default=25,
+                             dest="frames", metavar="NUMBER",
+                             help="movie's frame rate (eg. 25, 29.97, 23.976)"
+                             " (default: 25.")
+    # other options
     m_parser = parser.add_argument_group('Misc Options')
     m_parser.add_argument("-b", "--back-to-the-future", action="store_true",
                           dest="unsafe_time_mode", default=False,
                           help="unsafe time mode. Don't get any errors if "
                           " timecode become negative.")
-    m_parser.add_argument("-B", "--back-to-the-block", action="store_true",
-                          dest="unsafe_number_mode", default=False,
-                          help="unsafe number mode. Don't get any errors if "
-                          "sub's numbers became negative.  (only for srt).")
     m_parser.add_argument("-w", "--warn", action="store_true", dest="is_warn",
                           default=False, help="enable warnings.")
     return parser
@@ -511,14 +524,15 @@ class SrtSub (Subtitle):
     Class to manage SubRip (*.srt) subtitle.
     Inherit from Subtitle.
     """
-    def __init__ (self, file_in, file_out,
-                  unsafe_time_mode=False, unsafe_number_mode=False):
+    def __init__ (self, file_in, file_out, unsafe_time_mode=False,
+                  unsafe_number_mode=False, ignore_extra=False):
         """file_in and file_out must be file-like objects."""
         self.time_sep = " --> "
         self.string_format = "%02d:%02d:%02d,%03d"
         reg_safe =   r'^(\d{2}):(\d{2}):(\d{2}),(\d{3})$'
         reg_unsafe = r'^(-{0,1}\d{1,}):(\d{2}):(\d{2}),(\d{3})$'
-        self.re_pattern = reg_unsafe if unsafe_time_mode else reg_safe
+        s = slice(None, -1) if ignore_extra else slice(None, None)
+        self.re_pattern = (reg_unsafe if unsafe_time_mode else reg_safe)[s]
         self.unsafe_number_mode = unsafe_number_mode
         super().__init__(self.string_format, self.re_pattern)
         self.file_in = file_in
@@ -607,8 +621,8 @@ if __name__ == '__main__':
     if opts.skip_bytes:
         skip_bytes(in_file, opts.skip_bytes)
     if opts.subtitle_type == 'srt':
-        newsub = SrtSub(in_file, out_file,
-                        opts.unsafe_time_mode, opts.unsafe_number_mode)
+        newsub = SrtSub(in_file, out_file, opts.unsafe_time_mode,
+                        opts.unsafe_number_mode, opts.ignore_extra)
         try:
             start_sub, end_sub = opts.range.split(':')
             newsub.set_subs_range(int(start_sub) if start_sub else None,

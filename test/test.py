@@ -345,6 +345,10 @@ class SrtReTest (unittest.TestCase):
         self.time_string_ok = ("00:12:56,123", "01:56:00,000", "12:00:02,999",
                                "00:10:12,010", "00:44:44,123",)
         self.time_string_ok__unsafe = "-1:44:44,123"
+        self.time_string_ok_ignore = ('01:26:45,730 --> 01:26:48,050xxxxx',
+                                      '01:26:41,380 --> 01:26:44,140 x: 2 y: 3',
+                                      '00:12:45,909 --> 00:12:47,568 foo bar',
+                                      '00:12:48,678 --> 00:12:51,615 [SPAM]',)
         self.time_string_err = ("0:44:44,123", "-1:44:44,123",
                                 "1:44:44,123", "01:56:1,123",
                                 "01:56:00,00", "01:56:00,1",
@@ -374,7 +378,16 @@ class SrtReTest (unittest.TestCase):
         for string in self.time_string_err:
             self.assertRaises(csub.MismatchTimeError,
                               self.subs.match_time, string)
-
+        s_obj = csub.SrtSub(None, None, True, 0, False) # not ignore (and unsafe)
+        sui_obj = csub.SrtSub(None, None, True, 0, True) # ignore (and unsafe)
+        ssi_obj = csub.SrtSub(None, None, False, 0, True) # ignore (and safe)
+        for s in self.time_string_ok_ignore:
+            self.assertRaises(csub.MismatchTimeError, s_obj.match_time, s)
+            self.assertTrue(sui_obj.match_time(s))
+            self.assertTrue(ssi_obj.match_time(s))
+            self.assertEqual(sui_obj.match_time(s).groups(),
+                             ssi_obj.match_time(s).groups())
+            
     def testSrtReNumber (self):
         for string in self.number_string_ok:
             self.assertTrue((self.subs.new_sub_num(string) is not None),
