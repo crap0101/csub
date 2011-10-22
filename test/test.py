@@ -315,8 +315,9 @@ class SrtFileTest (unittest.TestCase):
                            SRT_FAKESUB_7_FAIL_INDEX,
                            SRT_FAKESUB_8_FAIL_INDEX, 
                            SRT_FAKESUB_9_FAIL_INDEX,):
-            sub = io.StringIO(sub_string)
-            newsub = csub.SrtSub(sub, copy.deepcopy(sub))
+            sub1 = io.StringIO(sub_string)
+            sub2 = io.StringIO(sub_string)
+            newsub = csub.SrtSub(sub1, sub2)
             self.assertRaises(csub.IndexNumError, newsub.main)
 
     def testUnhandledError (self):
@@ -616,7 +617,7 @@ class MiscTest (unittest.TestCase):
                                self.assertNotEqual(fin.read(), fout.read())
                                
     def testLookupEncoding(self):
-        fake_encs = ['us-asciiuga', 'utf-otto', 'foo-far-baz']
+        fake_encs = ['us-asciiuga', 'utf-otto', 'foo-bar-baz']
         files = glob.glob(op.join(CWD, DATA_DIR, '_enc_*.srt'))
         cmdline = "{exe} {prog} -i {fin} -o {fout} -t srt -e {enc}"
         cmd_dict = {'exe':PYTHON_EXE, 'prog':PROGFILE, 'enc':None,}
@@ -629,7 +630,7 @@ class MiscTest (unittest.TestCase):
             cmd = shlex.split(cmdline.format(**cmd_dict))
             pipe = sbp.Popen(cmd, stdout=sbp.PIPE, stderr=sbp.PIPE)
             pipe.communicate()
-            self.assertEqual(pipe.returncode, 0)
+            self.assertEqual(pipe.returncode, 0, "%s" % (cmd))
         for enc in fake_encs:
             cmd_dict['enc'] = enc
             cmd = shlex.split(cmdline.format(**cmd_dict))

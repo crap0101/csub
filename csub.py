@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-VERSION = '1.2_20110916'
+VERSION = '1.2_20111023'
 
 """csub {0} - utility to synchronize subtitle files
 
@@ -112,9 +112,10 @@ def TempFileManager (methods):
 
 def get_parser():
     """Return an argparse's parser object."""
-    parser = argparse.ArgumentParser(version="csub %s" % VERSION)
+    parser = argparse.ArgumentParser()
     parser.add_argument("--info", dest="info", action="store_true",
                         help="print informations about the program and exit.")
+    parser.add_argument('--version', action='version', version='csub %s' % VERSION)
     # I/O options
     io_parser = parser.add_argument_group('Input and Output')
     io_parser.add_argument("-i", "--input-file", dest="infile", metavar="FILE",
