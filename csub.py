@@ -140,7 +140,8 @@ def get_parser():
                            " replacement marker (such as '?') where there is"
                            " malformed data. Default to 'strict'.")
     io_parser.add_argument("-s", "--skip-bytes", dest="skip_bytes", type=int,
-                           metavar="NUM", help="skip the first NUM file's bytes.")
+                           metavar="NUM", help="skip the first NUM file's"
+                           " bytes (must be an integer >= 0).")
     # subtiles options
     s_parser = parser.add_argument_group('Subtitle Options')
     srt_parser = parser.add_argument_group('Subrip (*.srt) Specific Options')
@@ -237,7 +238,6 @@ class TempFile:
     def write_back (self):
         with open(self.in_file, 'wb') as _in:
             _in.write(self.read())
-            _in.truncate()
 
 
 class BadFormatError (Exception):
@@ -620,6 +620,9 @@ if __name__ == '__main__':
             out_file = open(opts.outfile, "w",
                             encoding=opts.encoding, errors=opts.enc_err)
     if opts.skip_bytes:
+        if opts.skip_bytes < 0:
+            save_on_error(in_file, out_file, tmpfile)
+            parser.error('-s|--skip-byte argument must be a positive value')
         skip_bytes(in_file, opts.skip_bytes)
     if opts.subtitle_type == 'srt':
         newsub = SrtSub(in_file, out_file, opts.unsafe_time_mode,
