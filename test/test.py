@@ -72,8 +72,9 @@ class TempFileTest (unittest.TestCase):
                 newsub = csub.SrtSub(ts, out, True)
                 newsub.main()
 
-    def testCmdlineOnFailSrt (self):
+    def testCmdLineOnFailSrt (self):
         commands = ["{exe} {prog} -i {input} -o {output}",
+                    "{exe} {prog} -i {input} -o {output} -t srt --stretch",
                     "{exe} {prog} -i {input} -o {output} -r 1:foo",
                     "{exe} {prog} -i {input} -o {output} -r 3",
                     "{exe} {prog} -i __FAIL__{input} -o {output} -t ass",
@@ -99,7 +100,7 @@ class TempFileTest (unittest.TestCase):
                     self.assertEqual(f.read(), orig,
                                      "sub file shouldn't be modified!")
 
-    def testCmdlineOnFailAss (self):
+    def testCmdLineOnFailAss (self):
         commands = ["{exe} {prog} -i {input} -o {output}",
                     "{exe} {prog} -i {input} -o {output} -t srt",
                     "{exe} {prog} -i {input} -o {output} -t sub -r 1:2",
@@ -124,7 +125,7 @@ class TempFileTest (unittest.TestCase):
                     self.assertEqual(f.read(), orig,
                                      "sub file shouldn't be modified!")
 
-    def testCmdlineOnFailMicroDVD (self):
+    def testCmdLineOnFailMicroDVD (self):
         commands = ["{exe} {prog} -i {input} -o {output}",
                     "{exe} {prog} -i {input} -o {output} -t srt",
                     "{exe} {prog} -i {input} -o {output} -t sub -f foo",
@@ -152,6 +153,47 @@ class TempFileTest (unittest.TestCase):
                     self.assertEqual(f.read(), orig,
                                      "sub file shouldn't be modified!")
 
+
+class TestCommandLine (unittest.TestCase):
+    def testCmdLineOK (self):
+        _ranges = itertools.cycle(
+            [('-r', '1:1000000'), ('-r', '3:'), ('-r', ':3')])
+        commands = [
+            "{exe} {prog} -i {input} -o {output} -t {type} --stretch :-300",
+            "{exe} {prog} -t {type} -i {input} --stretch=-200:400",
+            "{exe} {prog} -i {input} -o {output} -t {type}",
+            "{exe} {prog} -i {input} -o {output} -t {type}",
+            "{exe} {prog} -i {input} -o {output} -t {type} --stretch 2:",
+            "{exe} {prog} -i {input} -o {output} -t {type} -m 999",]
+        cmd_dict = {'exe': PYTHON_EXE,
+                    'input': None,
+                    'output': None,
+                    'prog': PROGFILE}
+        for s in itertools.chain(
+            glob.glob(op.join(CWD, DATA_DIR, 'test*.[sa][rus][tsb]'))):
+            with tempfile.NamedTemporaryFile() as out:
+                o = out.name
+            with open(s) as f:
+                orig = f.read()
+            t = op.splitext(s)[-1][1:]
+            cmd_dict['input'] = s
+            cmd_dict['output'] = o
+            cmd_dict['type'] = t
+            for cmd in commands:
+                cmdline = shlex.split(cmd.format(**cmd_dict))
+                if t == 'srt':
+                    cmdline.extend(next(_ranges))
+                pipe = sbp.Popen(cmdline, stdout=sbp.PIPE, stderr=sbp.PIPE)
+                pipe.communicate()[0]
+                retcode = pipe.returncode
+                self.assertEqual(
+                    retcode, 0, "Retcode != 0: {ret} | '{cmd}' | {file}".format(
+                                ret=retcode, cmd=' '.join(cmdline), file=s))
+                with open(s) as f:
+                    self.assertEqual(f.read(), orig,
+                                     "original sub file modified! ARGGGGH!!!")
+
+
 class MicroDVDFIleTest (unittest.TestCase):
     """Test operation on microDVD files. """
     def testOkMicroDvdSub (self):
@@ -166,6 +208,28 @@ class MicroDVDFIleTest (unittest.TestCase):
             infile.seek(0)
             outfile.seek(0)
             self.assertEqual(infile.read(), outfile.read())
+
+    def testMicroDvdStretch (self):
+        def test (sub):
+            infile = io.StringIO(sub)
+            outfile = io.StringIO()
+            inst = csub.MicroDVD(infile, outfile)
+            sl , sr = [random.randint(0, 10000) for _ in 'LR']
+            inst.stretch = sl, sr
+            inst.main()
+            infile.seek(0)
+            outfile.seek(0)
+            for l1, l2 in zip(infile, outfile):
+                match_1 = re.match(inst.RE_MATCH_TIME, l1)
+                self.assertTrue(match_1, msg="no match in line: %s" % l1)
+                start1, end1, rest = match_1.groups()
+                match_2 = re.match(inst.RE_MATCH_TIME, l2)
+                self.assertTrue(match_2, msg="no match in line:'%s'" % l2)
+                start2, end2, rest = match_2.groups()
+                self.assertEqual(int(start1) + sl, int(start2))
+                self.assertEqual(int(end1) + sr, int(end2))
+        for s in (MICRODVD_FAKESUB_0, MICRODVD_FAKESUB_1, MICRODVD_FAKESUB_2):
+            test(s)
 
     def testMicroDvdTimeTransformFrames (self):
         _r = random.randint
@@ -465,6 +529,14 @@ class SrtTimeTransformTest (unittest.TestCase):
             self.assertEqual(self.update_time(*strtime[0]),
                              strtime[1],
                              "failed on %s"  % repr(strtime))
+    def testStretch (self):
+        self.subs = csub.SrtSub(None, None, True)
+        for _ in range(100):
+            self.subs.stretch = [random.randint(-1000, 1000) for _ in 'LR']
+            for strtime in self.time_strings:
+                self.assertEqual(self.update_time(*strtime[0]),
+                                 strtime[1],
+                                 "failed on %s"  % repr(strtime))
 
 
 class AssFileTest (unittest.TestCase):
@@ -513,6 +585,8 @@ class AssFileTest (unittest.TestCase):
                 inst = csub.AssSub(sub_in, sub_out)
                 time_delta = [_r(11,13), _r(1,200), _r(1,200), _r(1,200)]
                 inst.set_delta(*time_delta)
+                stretch = [_r(-100, 10000) for _ in 'LR']
+                inst.stretch = stretch
                 inst.main()
                 # check back, fail without -b option:
                 sub_out.seek(0)
@@ -520,6 +594,7 @@ class AssFileTest (unittest.TestCase):
                 sub_in.truncate()
                 inst = csub.AssSub(sub_out, sub_in)
                 inst.set_delta(*list(_neg(t) for t in time_delta))
+                inst.stretch = [_neg(x) for x in stretch]
                 self.assertRaises(csub.MismatchTimeError, inst.main)
                 # no fail:
                 sub_out.seek(0)
@@ -527,6 +602,7 @@ class AssFileTest (unittest.TestCase):
                 sub_in.truncate()
                 inst = csub.AssSub(sub_out, sub_in, True)
                 inst.set_delta(*list(_neg(t) for t in time_delta))
+                inst.stretch = [_neg(x) for x in stretch]
                 sub_in.seek(0)
                 inst.main()
                 sub_in.seek(0)
@@ -644,7 +720,7 @@ def load_tests():
     loader = unittest.TestLoader()
     test_cases = (SrtFileTest, SrtReTest, SrtTimeTransformTest,
                   TempFileTest, AssFileTest, MicroDVDFIleTest,
-                  MiscTest)
+                  MiscTest, TestCommandLine)
     return (loader.loadTestsFromTestCase(t) for t in test_cases)
 
 

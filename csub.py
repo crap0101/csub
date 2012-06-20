@@ -71,6 +71,9 @@ def iterdec (multicall=False):
         return _iterdec2
     return _iterdec1
 
+def get_stretch (s):
+    return [(int(x) if x else 0) for x in s.strip().split(':')]
+
 def numslice(n, i, keep_sign=False):
     '''
     Return the slice of the *i* most significant digs of *n*
@@ -118,13 +121,6 @@ def get_parser():
     parser.add_argument('--version', action='version', version='csub %s' % VERSION)
     # I/O options
     io_parser = parser.add_argument_group('Input and Output')
-    io_parser.add_argument("-i", "--input-file", dest="infile", metavar="FILE",
-                           help="read the subtitle from FILE (default: stdin).")
-    io_parser.add_argument("-o", "--output-file", dest="outfile", metavar="FILE",
-                           help="write the subtitle in FILE (default: stdout).")
-    io_parser.add_argument("-t", "--type", dest="subtitle_type",
-                           metavar="TYPE", help="subtitle file type: (ass|ssa,"
-                           " srt, sub|microdvd).")
     io_parser.add_argument("-e", "--encoding", dest="encoding", metavar="NAME",
                            default='utf-8', help="subtitle encoding to use for"
                            " reading and writing files. Must match the input "
@@ -139,9 +135,16 @@ def get_parser():
                            " can lead to data loss) or 'replace' to insert a"
                            " replacement marker (such as '?') where there is"
                            " malformed data. Default to 'strict'.")
+    io_parser.add_argument("-i", "--input-file", dest="infile", metavar="FILE",
+                           help="read the subtitle from FILE (default: stdin).")
+    io_parser.add_argument("-o", "--output-file", dest="outfile", metavar="FILE",
+                           help="write the subtitle in FILE (default: stdout).")
     io_parser.add_argument("-s", "--skip-bytes", dest="skip_bytes", type=int,
                            metavar="NUM", help="skip the first NUM file's"
                            " bytes (must be an integer >= 0).")
+    io_parser.add_argument("-t", "--type", dest="subtitle_type",
+                           metavar="TYPE", help="subtitle file type: (ass|ssa,"
+                           " srt, sub|microdvd).")
     # subtiles options
     s_parser = parser.add_argument_group('Subtitle Options')
     srt_parser = parser.add_argument_group('Subrip (*.srt) Specific Options')
@@ -149,26 +152,38 @@ def get_parser():
         '(Advanced) SubStation Alpha (*.ass, *.ssa) Specific Options')
     mdvd_parser = parser.add_argument_group('MicoDVD (*.sub) Specific Options')
     ## all subtitles
-    s_parser.add_argument("-S", "--seconds", type=int,
-                          default=0, dest="sec", metavar="NUMBER",
-                          help="change the seconds values by NUMBER.")
-    s_parser.add_argument("-M", "--minutes", type=int,
-                          dest="min", default=0, metavar="NUMBER",
-                          help="change the minutes values by NUMBER.")
     s_parser.add_argument("-H", "--hours", type=int,
                           dest="hour", default=0, metavar="NUMBER",
                           help="change the hours values by NUMBER.")
+    s_parser.add_argument("-M", "--minutes", type=int,
+                          dest="min", default=0, metavar="NUMBER",
+                          help="change the minutes values by NUMBER.")
     s_parser.add_argument("-m", "--milliseconds", dest="ms", default=0,
                           metavar="NUMBER", choices=range(-999, 1000), type=int,
                           help="change the milliseconds values by NUMBER. "
                           "(NOTE: this value must be in range -999..999).")
+    s_parser.add_argument("-S", "--seconds", type=int,
+                          default=0, dest="sec", metavar="NUMBER",
+                          help="change the seconds values by NUMBER.")
+    s_parser.add_argument("--stretch", dest='stretch',
+                          default=':', metavar='LSHIFT:RSHIFT',
+                          help="""stretch subs time by the given pair of
+                          colon-separated values expressed in milliseconds
+                          (can be omitted, evaluate to zero in this case,
+                          i.e.: no changes). [NOTE: read further
+                          how this option is handled with microDVD and
+                          SubStation Alpha subtitles]). The first argument is
+                          the amount of time by which the subtitle's start time
+                          will be shifted ahead (so, a negative value cause
+                          the time to be shifted backwards; the 2nd is the
+                          amount of time by which the subtitle's end time
+                          will be shifted ahead (a negative value will cause a
+                          backwards shift). NOTE: for microDVD subtitle
+                          the meaning of these values are understood as the
+                          number of frames to shift.
+                          ALSO NOTE: with SubStation Alpha subtitles these
+                          values are understood as hundreds.""")
     ## srt
-    srt_parser.add_argument("-n", "--num", type=int, dest="num", default=0,
-                            metavar="NUMBER",  help="change the progressive"
-                            " subtitle number by NUMBER.")
-    srt_parser.add_argument("-r", "--range", dest="range", default=':',
-                            metavar="START:END", help="apply changes only for"
-                            " subs between START and END (excluded).")
     srt_parser.add_argument("-B", "--back-to-the-block", action="store_true",
                             dest="unsafe_number_mode", default=False,
                             help="unsafe number mode. Don't get any errors if "
@@ -181,6 +196,15 @@ def get_parser():
                             ' are normally treated as errors; you must use this'
                             ' option for parsing such a subtitles. NOTE: Those'
                             ' informations are not kept in the new file.')
+    srt_parser.add_argument("-n", "--num", type=int, dest="num", default=0,
+                            metavar="NUMBER",  help="change the progressive"
+                            " subtitle number by NUMBER.")
+    srt_parser.add_argument("-r", "--range", dest="range", default=':',
+                            metavar="START:END", help="""apply changes only
+                            "blocks between START and END (excluded).
+                            Both START and END can be omitted, in such case
+                            START evaluate to zero (i.e. from the beginning)
+                            where END evaluate to +inf (i.e. to the end).""")
     ## microDVD
     mdvd_parser.add_argument("-f", "--delta-frames", type=int, default=0,
                              dest="delta_frames", metavar="NUMBER",
@@ -290,6 +314,7 @@ class Subtitle:
     and subtitles formatting.
     """
     def __init__ (self, str_format='', re_pattern='.*'):
+        self.set_delta()
         self.STRING_FORMAT = str_format
         self.RE_MATCH_TIME = re.compile(re_pattern)
         self.RE_MATCH_NUMBER = re.compile('^-{0,1}\d+$')
@@ -304,6 +329,14 @@ class Subtitle:
         self.IN_RANGE = True
         self.check_range_to_edit = self.edit_range()
         self.actual_numline = 0
+        self.stretch_left = self.stretch_right = 0
+
+    @property
+    def stretch (self):
+        return self.stretch_left, self.stretch_right
+    @stretch.setter
+    def stretch (self, pair):
+        self.stretch_left, self.stretch_right = pair
 
     @staticmethod
     def edit_range(start=None, stop=None):
@@ -398,12 +431,12 @@ class Subtitle:
 
 class MicroDVD (Subtitle):
     """
-    Class to manage MicroDVD (*.sub) subtitle. Inherit from Subtitle.
+    Class to manage MicroDVD (*.sub) subtitle.
     """
     def __init__ (self, file_in, file_out, frames=25,
                   unsafe_time_mode=False, use_secs=False):
         """file_in and file_out must be file-like objects."""
-        str_fmt = '{%d}{%d}%s\n'
+        str_fmt = '{{{start}}}{{{end}}}{rest}\n'
         reg = '^{(\d+)}{(\d+)}(.*)$'
         reg_unsafe = '^{(-{0,1}\d+)}{(-{0,1}\d+)}(.*)$'
         super().__init__(str_fmt, reg if not unsafe_time_mode else reg_unsafe)
@@ -441,7 +474,10 @@ class MicroDVD (Subtitle):
         for self.actual_numline, line in zip(itertools.count(1), self.infile):
             *time, rest = self.match_time(line).groups()
             start, end = self.new_time(map(int, time))
-            self.outfile.write(self.STRING_FORMAT % (start, end, rest))
+            self.outfile.write(self.STRING_FORMAT.format(
+                start=start+self.stretch_left,
+                end=end+self.stretch_right,
+                rest=rest))
 
 
 class AssSub (Subtitle):
@@ -476,13 +512,13 @@ class AssSub (Subtitle):
         # NOTE: since ass/ssa use 2-digit precision for fraction of seconds
         # *MAX_MS* is used as an alias for *MAX_HNDRS* and *self.delta_ms*
         # used in various methods of the base class refer to hundreds, not
-        # milliseconds (to avoid rewrite methos in the base class).
+        # milliseconds (to avoid rewrite methods in the base class).
 
-    def new_time(self, time_string, sec_sep):
+    def new_time(self, time_string, sec_sep, stretch):
         """Return a string representing the the subtitle time."""
         h, m, s, hndrs = list(map(
             int, self.time_reg.match(time_string).groups()))
-        total_secs, hndrs = self.new_time_tuple(h, m, s, hndrs)
+        total_secs, hndrs = self.new_time_tuple(h, m, s, hndrs + stretch)
         h, m, s = self.times_from_secs(total_secs)
         return "%d:%02d:%02d%s%02d" % (h, m, s, sec_sep, hndrs)
 
@@ -497,8 +533,8 @@ class AssSub (Subtitle):
             try:
                 match = self.reg.match(line)
                 init, start, start_sep, end, end_sep, rest = match.groups()
-                new_start = self.new_time(start, start_sep)
-                new_end = self.new_time(end, end_sep)
+                new_start = self.new_time(start, start_sep, self.stretch_left)
+                new_end = self.new_time(end, end_sep, self.stretch_right)
                 return ','.join((init, new_start, new_end, rest))
             except ValueError as err:
                 raise MismatchTimeError(
@@ -538,6 +574,26 @@ class SrtSub (Subtitle):
         super().__init__(self.string_format, self.re_pattern)
         self.file_in = file_in
         self.file_out = file_out
+        self._sl = self._ml = self._sr = self._mr = 0 # stretch
+
+    @property
+    def stretch (self):
+        return self.stretch_left, self.stretch_right
+    @stretch.setter
+    def stretch (self, pair):
+        self.stretch_left, self.stretch_right = pair
+        if abs(self.stretch_left) >= self.MAX_MS:
+            self._sl, self._ml = divmod(abs(self.stretch_left), self.MAX_MS)
+            if self.stretch_left < 0:
+                self._ml = -self._ml
+        else:
+            self._ml = self.stretch_left
+        if abs(self.stretch_right) >= self.MAX_MS:
+            self._sr, self._mr = divmod(abs(self.stretch_right), self.MAX_MS)
+            if self.stretch_right < 0:
+                self._mr = -self._mr 
+        else:
+            self._mr = self.stretch_right
 
     @iterdec()
     def num_block (self, nums_string):
@@ -556,10 +612,14 @@ class SrtSub (Subtitle):
             raise MismatchTimeError("[at line %d] '%s' (in %s)"
                  % (self.actual_numline, time_string, "time_block"))
         h, m, s, ms = list(map(int, self.match_time(start).group(1, 2, 3, 4)))
+        s += self._sl
+        ms += self._ml
         sec, ms = self.new_time_tuple(h, m, s, ms)
         nh, nm, ns = self.times_from_secs(sec)
         new_start = self.string_format % (nh, nm, ns, ms)
-        h, m, s, ms = list(map(int, self.match_time(end).group(1, 2, 3 , 4)))
+        h, m, s, ms = list(map(int, self.match_time(end).group(1, 2, 3, 4)))
+        s += self._sr
+        ms += self._mr
         sec, ms = self.new_time_tuple(h, m, s, ms)
         nh, nm, ns = self.times_from_secs(sec)
         new_end = self.string_format % (nh, nm, ns, ms)
@@ -572,7 +632,7 @@ class SrtSub (Subtitle):
         return line.rstrip()
 
     def main (self):
-        """Doing the job. """
+        """Doing the job. """       
         cycle = self.make_iter_blocks(self.num_block,
                                       self.time_block,
                                       self.text_block)
@@ -631,7 +691,7 @@ if __name__ == '__main__':
             start_sub, end_sub = opts.range.split(':')
             newsub.set_subs_range(int(start_sub) if start_sub else None,
                                   int(end_sub) if end_sub else None)
-        except ValueError as e:
+        except e:
             save_on_error(in_file, out_file, tmpfile)
             parser.error('invalid -r/--range option: {val} [{err}]'.format(
                 val=opts.range, err=str(e)))
@@ -674,6 +734,14 @@ if __name__ == '__main__':
                 subtype='SubStation Alpha', what='-B/--back-to-the-block'))
         newsub.set_delta(opts.hour, opts.min, opts.sec, opts.ms, opts.num)
     newsub.IS_WARN = opts.is_warn
+    if opts.stretch:
+        try:
+            sl, sr = get_stretch(opts.stretch)
+            newsub.stretch = sl, sr
+        except e:
+            save_on_error(in_file, out_file, tmpfile)
+            parser.error('invalid --stretch option: {val} [{err}]'.format(
+                val=opts.stretch, err=str(e)))
     try:
         newsub.main()
     except (BadFormatError, MismatchTimeError,

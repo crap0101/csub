@@ -60,7 +60,6 @@ MICRODVD_FAKESUB_FAIL_SYNTAX_7 = """{8465}{8488}Lasciali andare!
 1{8535}{8583}Cosa c'è?|Che succede?
 """
 
-
 SRT_FAKESUB_0 = """1567
 01:26:32,200 --> 01:26:35,060
 un figlio di puttana faceva ruotare la freccetta
