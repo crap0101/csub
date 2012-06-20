@@ -168,21 +168,19 @@ def get_parser():
     s_parser.add_argument("--stretch", dest='stretch',
                           default=':', metavar='LSHIFT:RSHIFT',
                           help="""stretch subs time by the given pair of
-                          colon-separated values expressed in milliseconds
-                          (can be omitted, evaluate to zero in this case,
-                          i.e.: no changes). [NOTE: read further
-                          how this option is handled with microDVD and
-                          SubStation Alpha subtitles]). The first argument is
-                          the amount of time by which the subtitle's start time
-                          will be shifted ahead (so, a negative value cause
-                          the time to be shifted backwards; the 2nd is the
-                          amount of time by which the subtitle's end time
-                          will be shifted ahead (a negative value will cause a
-                          backwards shift). NOTE: for microDVD subtitle
-                          the meaning of these values are understood as the
-                          number of frames to shift.
-                          ALSO NOTE: with SubStation Alpha subtitles these
-                          values are understood as hundreds.""")
+                          colon-separated values (can be omitted, evaluate to
+                          zero in this case). The first argument is the
+                          amount by which the subtitle's start time will be
+                          shifted ahead (so, a negative value cause backwards
+                          shifting; the 2nd is the amount by which the
+                          subtitle's end time will be shifted ahead (a negative
+                          value will cause a backwards shifting).
+                          NOTES on START and END values: used with a subrip
+                          (*.srt) subtitle are understooded as expressed
+                          in milliseconds, for microDVD subtitle (*.sub)
+                          are understood as the number of frames to shift,
+                          while with SubStation Alpha subtitles (*.ass, *.ssa)
+                          are understood as centiseconds.""")
     ## srt
     srt_parser.add_argument("-B", "--back-to-the-block", action="store_true",
                             dest="unsafe_number_mode", default=False,
@@ -585,12 +583,14 @@ class SrtSub (Subtitle):
         if abs(self.stretch_left) >= self.MAX_MS:
             self._sl, self._ml = divmod(abs(self.stretch_left), self.MAX_MS)
             if self.stretch_left < 0:
+                self._sl = -self._sl
                 self._ml = -self._ml
         else:
             self._ml = self.stretch_left
         if abs(self.stretch_right) >= self.MAX_MS:
             self._sr, self._mr = divmod(abs(self.stretch_right), self.MAX_MS)
             if self.stretch_right < 0:
+                self._sr = -self._sr 
                 self._mr = -self._mr 
         else:
             self._mr = self.stretch_right
