@@ -81,7 +81,9 @@ class TempFileTest (unittest.TestCase):
                     "{exe} {prog} -i {input} -o {output} -t srt -H foo",
                     "{exe} {prog} -i {input} -o {output} -t srt --not-exist",
                     "{exe} {prog} -i {input} -o {output} -t srt -m 9999",]
-        cmd_dict = {'exe':PYTHON_EXE, 'input':None,'output':None, 'prog':PROGFILE}
+        cmd_dict = {'exe':PYTHON_EXE,
+                    'input':None,'output':None,
+                    'prog':PROGFILE}
         for subfile in itertools.chain(
             glob.glob(op.join(CWD, DATA_DIR, 'test*.srt'))):
             with open(subfile) as f:
@@ -103,10 +105,12 @@ class TempFileTest (unittest.TestCase):
     def testCmdLineOnFailAss (self):
         commands = ["{exe} {prog} -i {input} -o {output}",
                     "{exe} {prog} -i {input} -o {output} -t srt",
-                    "{exe} {prog} -i {input} -o {output} -t sub -r 1:2",
+                    "{exe} {prog} -i {input} -o {output} -t sub -I",
                     "{exe} {prog} -i {input} -o {output} -t ass -n 11",
                     "{exe} {prog} -i {input} -o {output} -t ass -B",]
-        cmd_dict = {'exe':PYTHON_EXE, 'input':None,'output':None, 'prog':PROGFILE}
+        cmd_dict = {'exe':PYTHON_EXE,
+                    'input':None,'output':None,
+                    'prog':PROGFILE}
         for subfile in itertools.chain(
             glob.glob(op.join(CWD, DATA_DIR, 'test*.sub'))):
             with open(subfile) as f:
@@ -131,10 +135,12 @@ class TempFileTest (unittest.TestCase):
                     "{exe} {prog} -i {input} -o {output} -t sub -f foo",
                     "{exe} {prog} -i {input} -o {output} -t sub -F",
                     "{exe} {prog} -i {input} -o {output} -t sub -f",
-                    "{exe} {prog} -i {input} -o {output} -t sub -r 1:2",
+                    "{exe} {prog} -i {input} -o {output} -t sub -I",
                     "{exe} {prog} -i {input} -o {output} -t sub -n 11",
                     "{exe} {prog} -i {input} -o {output} -t sub -B",]
-        cmd_dict = {'exe':PYTHON_EXE, 'input':None,'output':None, 'prog':PROGFILE}
+        cmd_dict = {'exe':PYTHON_EXE,
+                    'input':None,'output':None,
+                    'prog':PROGFILE}
         for subfile in itertools.chain(
             glob.glob(op.join(CWD, DATA_DIR, 'test*.ass'))):
             with open(subfile) as f:
@@ -181,17 +187,16 @@ class TestCommandLine (unittest.TestCase):
             cmd_dict['type'] = t
             for cmd in commands:
                 cmdline = shlex.split(cmd.format(**cmd_dict))
-                if t == 'srt':
-                    cmdline.extend(next(_ranges))
+                cmdline.extend(next(_ranges))
                 pipe = sbp.Popen(cmdline, stdout=sbp.PIPE, stderr=sbp.PIPE)
                 pipe.communicate()[0]
                 retcode = pipe.returncode
-                self.assertEqual(
-                    retcode, 0, "Retcode != 0: {ret} | '{cmd}' | {file}".format(
-                                ret=retcode, cmd=' '.join(cmdline), file=s))
+                self.assertEqual(retcode, 0,
+                    "Retcode != 0: {ret} | '{cmd}' | {file}".format(
+                        ret=retcode, cmd=' '.join(cmdline), file=s))
                 with open(s) as f:
                     self.assertEqual(f.read(), orig,
-                                     "original sub file modified! ARGGGGH!!!")
+                        "original sub file modified! ARGGGGH!!!")
 
 
 class MicroDVDFIleTest (unittest.TestCase):
@@ -240,7 +245,7 @@ class MicroDVDFIleTest (unittest.TestCase):
                 frame_delta = _r(1, 10000)
                 infile = io.StringIO(sub)
                 outfile = io.StringIO()
-                #in_file, out_file, opts.frames, opts.unsafe_time_mode, use_secs
+                #in_file,out_file,opts.frames,opts.unsafe_time_mode,use_secs
                 inst = csub.MicroDVD(infile, outfile)
                 #opts.hour, opts.min, opts.sec, opts.ms, opts.delta_frames
                 inst.set_delta(0,0,0,0, frame_delta)
@@ -266,7 +271,7 @@ class MicroDVDFIleTest (unittest.TestCase):
             for i in range(1000):
                 infile = io.StringIO(sub)
                 outfile = io.StringIO()
-                #in_file, out_file, opts.frames, opts.unsafe_time_mode, use_secs
+                #in_file,out_file,opts.frames,opts.unsafe_time_mode,use_secs
                 inst = csub.MicroDVD(infile, outfile, use_secs=True)
                 #opts.hour, opts.min, opts.sec, opts.ms, opts.delta_frames
                 inst_args = [_r(1,10), _r(1,100), _r(1, 200), _r(100,3300), 0]
@@ -336,7 +341,7 @@ class SrtFileTest (unittest.TestCase):
             cmdline.append('%s srt' %
                            ('-t' if random.randint(0,1) else '--type'))
             cmdline = shlex.split(' '.join(cmdline))
-            fpipe = sbp.Popen(["echo", "-n", sub], shell=True, stdout=sbp.PIPE)
+            fpipe = sbp.Popen(["echo","-n",sub], shell=True, stdout=sbp.PIPE)
             spipe = sbp.Popen(cmdline, shell=True,
                               stdin=fpipe.stdout, stdout=sbp.PIPE)
             fpipe.stdout.close() 
@@ -410,40 +415,43 @@ class SrtReTest (unittest.TestCase):
         self.time_string_ok = ("00:12:56,123", "01:56:00,000", "12:00:02,999",
                                "00:10:12,010", "00:44:44,123",)
         self.time_string_ok__unsafe = "-1:44:44,123"
-        self.time_string_ok_ignore = ('01:26:45,730 --> 01:26:48,050xxxxx',
-                                      '01:26:41,380 --> 01:26:44,140 x: 2 y: 3',
-                                      '00:12:45,909 --> 00:12:47,568 foo bar',
-                                      '00:12:48,678 --> 00:12:51,615 [SPAM]',)
-        self.time_string_err = ("0:44:44,123", "-1:44:44,123",
-                                "1:44:44,123", "01:56:1,123",
-                                "01:56:00,00", "01:56:00,1",
-                                "02:-4:44,123", "00:44:-44,123",
-                                "00:44:44,-123", "+00:44:44,123",
-                                "00:+44:44,123", "00:44:+44,123",
-                                "00:44:44,+123", "01:4:+19,123",
-                                "00:44:33:123", "OO:44:33,123",
-                                "00:44:33,0xa", "00:4a:33,123",
-                                "01:56:111,234", "01:2:00,343",
-                                "01:562:00,432","1:56:00,000",
-                                "-11:562:00,432","-1:56:00,000",)
-        self.number_string_ok =("1", "01", "0009", "09", "1234567",
-                                "-12", "01", "0", "-02", "-93",)
-        self.number_string_err =("+097a", "07a",  "0xffffffff", "+", "-",
-                                  "-2e10",  "2e10", "stringa",)
+        self.time_string_ok_ignore = (
+            '01:26:45,730 --> 01:26:48,050xxxxx',
+            '01:26:41,380 --> 01:26:44,140 x: 2 y: 3',
+            '00:12:45,909 --> 00:12:47,568 foo bar',
+            '00:12:48,678 --> 00:12:51,615 [SPAM]',)
+        self.time_string_err = (
+            "0:44:44,123", "-1:44:44,123",
+            "1:44:44,123", "01:56:1,123",
+            "01:56:00,00", "01:56:00,1",
+            "02:-4:44,123", "00:44:-44,123",
+            "00:44:44,-123", "+00:44:44,123",
+            "00:+44:44,123", "00:44:+44,123",
+            "00:44:44,+123", "01:4:+19,123",
+            "00:44:33:123", "OO:44:33,123",
+            "00:44:33,0xa", "00:4a:33,123",
+            "01:56:111,234", "01:2:00,343",
+            "01:562:00,432","1:56:00,000",
+            "-11:562:00,432","-1:56:00,000",)
+        self.number_string_ok = (
+            "1", "01", "0009", "09", "123467", "-12", "01", "0", "-02", "-93")
+        self.number_string_err =(
+            "+097a", "07a",  "0xffffffff", "+", "-", "-2e10",  "2e10", "str")
 
     def testSrtReTime (self):
-        self.unsafe_subs = csub.SrtSub(None, None, True) # for testing unsafe mode
+        self.unsafe_subs = csub.SrtSub(None, None, True) # test unsafe mode
         for string in self.time_string_ok:
             self.assertTrue(self.subs.match_time(string),
                             "Failed on %s" % string)
             self.assertTrue(self.unsafe_subs.match_time(string),
                             "Failed on %s" % string)
-        self.assertTrue(self.unsafe_subs.match_time(self.time_string_ok__unsafe),
-                        "Failed on %s" % self.time_string_ok__unsafe)
+        self.assertTrue(
+            self.unsafe_subs.match_time(self.time_string_ok__unsafe),
+            "Failed on %s" % self.time_string_ok__unsafe)
         for string in self.time_string_err:
             self.assertRaises(csub.MismatchTimeError,
                               self.subs.match_time, string)
-        s_obj = csub.SrtSub(None, None, True, 0, False) # not ignore (and unsafe)
+        s_obj = csub.SrtSub(None,None,True,0,False) # not ignore (and unsafe)
         sui_obj = csub.SrtSub(None, None, True, 0, True) # ignore (and unsafe)
         ssi_obj = csub.SrtSub(None, None, False, 0, True) # ignore (and safe)
         for s in self.time_string_ok_ignore:
@@ -469,44 +477,52 @@ class SrtTimeTransformTest (unittest.TestCase):
         self.subs.ITER_FUNC = self.subs.make_iter_blocks(
             self.subs.text_block, lambda *args: args)
         self.subs._get_func = next(self.subs.ITER_FUNC)
-        self.sep_err = ("00:01:31,970-->00:01:33,450",
-                        "00:01:31,970 -> 00:01:33,450",
-                        "00:01:31,970  00:01:33,450",)
-        self.time_lines = ("00:58:18,860 --> 00:58:21,950",
-                           "00:59:00,600 --> 00:59:03,530",
-                           "00:59:05,370 --> 00:59:07,470",
-                           "00:01:31,970 --> 00:01:33,450",
-                           "00:01:35,710 --> 00:01:43,690",
-                           "00:01:55,820 --> 00:01:57,870",)
-        self.time_strings = ((("00:01:31,970", 1, 0, 0, 0), "01:01:31,970"),
-                             (("00:01:33,450", 0, 3, 11, 1), "00:04:44,451"),
-                             (("00:01:35,710", 0, 59, 0, 0), "01:00:35,710"),
-                             (("00:01:43,690", 0, 0, 20, 0), "00:02:03,690"),
-                             (("00:01:55,820", 0, 59, 5, 0), "01:01:00,820"),
-                             (("00:01:55,820", 0, 59, 5, 180), "01:01:01,000"),
-                             (("00:01:57,870", 0, -1, 3, 0), "00:01:00,870"),
-                             (("00:01:57,870", 0, -1, 3, -871), "00:00:59,999"),
-                             (("01:58:18,860", 1, -60, 0, 0), "01:58:18,860"),
-                             (("01:58:21,950", 1, 0, -3600, 0), "01:58:21,950"),
-                             (("00:59:00,600", 0, 0, 0, 400), "00:59:01,000"),
-                             (("00:59:03,530", 0, 1, 57, -530), "01:01:00,000"),
-                             (("02:00:00,370", -1, 0, 0, -371), "00:59:59,999"), 
-                             (("00:59:07,470", 0, -59, -7, -470), "00:00:00,000"),
-                             (("01:14:00,600", -1, 60, 0, 0), "01:14:00,600"),
-                             (("02:59:03,530", 0, 0, 57, -529), "03:00:00,001"),
-                             (("01:59:00,001", 0, 0, 0, -2), "01:58:59,999"),
-                             (("02:59:59,060", 0, 0, 0, 940), "03:00:00,000"),)
+        self.sep_err = (
+            "00:01:31,970-->00:01:33,450",
+            "00:01:31,970 -> 00:01:33,450",
+            "00:01:31,970  00:01:33,450",
+        )
+        self.time_lines = (
+            "00:58:18,860 --> 00:58:21,950",
+            "00:59:00,600 --> 00:59:03,530",
+            "00:59:05,370 --> 00:59:07,470",
+            "00:01:31,970 --> 00:01:33,450",
+            "00:01:35,710 --> 00:01:43,690",
+            "00:01:55,820 --> 00:01:57,870",
+        )
+        self.time_strings = (
+            (("00:01:31,970", 1, 0, 0, 0), "01:01:31,970"),
+            (("00:01:33,450", 0, 3, 11, 1), "00:04:44,451"),
+            (("00:01:35,710", 0, 59, 0, 0), "01:00:35,710"),
+            (("00:01:43,690", 0, 0, 20, 0), "00:02:03,690"),
+            (("00:01:55,820", 0, 59, 5, 0), "01:01:00,820"),
+            (("00:01:55,820", 0, 59, 5, 180), "01:01:01,000"),
+            (("00:01:57,870", 0, -1, 3, 0), "00:01:00,870"),
+            (("00:01:57,870", 0, -1, 3, -871), "00:00:59,999"),
+            (("01:58:18,860", 1, -60, 0, 0), "01:58:18,860"),
+            (("01:58:21,950", 1, 0, -3600, 0), "01:58:21,950"),
+            (("00:59:00,600", 0, 0, 0, 400), "00:59:01,000"),
+            (("00:59:03,530", 0, 1, 57, -530), "01:01:00,000"),
+            (("02:00:00,370", -1, 0, 0, -371), "00:59:59,999"), 
+            (("00:59:07,470", 0, -59, -7, -470), "00:00:00,000"),
+            (("01:14:00,600", -1, 60, 0, 0), "01:14:00,600"),
+            (("02:59:03,530", 0, 0, 57, -529), "03:00:00,001"),
+            (("01:59:00,001", 0, 0, 0, -2), "01:58:59,999"),
+            (("02:59:59,060", 0, 0, 0, 940), "03:00:00,000"),
+        )
 
     def update_time (self, string_time, hours, mins, secs, ms):
         self.subs.set_delta(hours, mins, secs, ms, 0)
-        h, m, s, ms = list(map(int, self.subs.match_time(string_time).group(1, 2, 3, 4)))
+        h, m, s, ms = list(
+            map(int, self.subs.match_time(string_time).group(1, 2, 3, 4)))
         secs, ms = self.subs.new_time_tuple(h, m, s, ms)
         nh, nm, ns = self.subs.times_from_secs(secs)
         return self.subs.string_format % (nh, nm, ns, ms)
 
     def random_time (self, orig_time_string):
-        delta_time = [random.randint(-100, 2000) for i in ("h", "m", "s", "n")]
-        delta_time.insert(-1, random.randint(-999, 999))
+        _r = random.randint
+        delta_time = [_r(-100, 2000) for i in ("h", "m", "s", "n")]
+        delta_time.insert(-1, _r(-999, 999))
         self.subs.set_delta(*delta_time)
         new_time_string = self.subs.time_block(orig_time_string)[0]
         self.subs.set_delta(*list(map(int.__neg__, delta_time)))
@@ -524,7 +540,7 @@ class SrtTimeTransformTest (unittest.TestCase):
                              "wrong time update in %s" % repr(tlines))
         for tlines in self.time_lines:
             self.assertEqual(tlines, self.random_time(tlines),
-                             "wrong (random) time update in %s" % repr(tlines))
+                "wrong (random) time update in %s" % repr(tlines))
         for strtime in self.time_strings:
             self.assertEqual(self.update_time(*strtime[0]),
                              strtime[1],
@@ -684,13 +700,13 @@ class MiscTest (unittest.TestCase):
                with open(file, encoding=enc, errors=err) as fin:
                    with tempfile.NamedTemporaryFile() as _fout:
                        _out = _fout.name
-                   with open(_out, mode='w', encoding=enc, errors=err) as fout:
+                   with open(_out,mode='w',encoding=enc,errors=err) as fout:
                        inst = csub.SrtSub(fin, fout)
                        if err == 'strict':
                            self.assertRaises(UnicodeDecodeError, inst.main)
                        else:
-                           with open(file, 'rb') as fin, open(_out, 'rb') as fout:
-                               self.assertNotEqual(fin.read(), fout.read())
+                           with open(file, 'rb') as i, open(_out,'rb') as o:
+                               self.assertNotEqual(i.read(),o.read())
                                
     def testLookupEncoding(self):
         fake_encs = ['us-asciiuga', 'utf-otto', 'foo-bar-baz']
@@ -714,6 +730,19 @@ class MiscTest (unittest.TestCase):
             pipe.communicate()
             self.assertNotEqual(pipe.returncode, 0)
 
+    def testRange (self):
+        st = [csub.SrtSub, csub.AssSub, csub.MicroDVD]
+        r = random.randint
+        for s in st:
+            ns = s(None, None)
+            s, e = r(-1112, 21212), r(44444, 66666)
+            ns.set_subs_range(s, e)
+            for i in range(s-s, s):
+                self.assertFalse(ns.check_range_to_edit(i))
+            for i in range(s, e):
+                self.assertTrue(ns.check_range_to_edit(i))
+            for i in range(e, e+e):
+                self.assertFalse(ns.check_range_to_edit(i))
 
 
 def load_tests():
@@ -731,8 +760,9 @@ if __name__ == '__main__':
     sys.path.insert(0, datadir)
     import csub
     from data.sub_strings import *
-    PROGFILE = op.join(op.split(op.dirname(op.realpath(__file__)))[0], 'csub.py')
-    unittest.TextTestRunner(verbosity=2).run(unittest.TestSuite(load_tests()))
+    PROGFILE = op.join(
+        op.split(op.dirname(op.realpath(__file__)))[0], 'csub.py')
+    unittest.TextTestRunner(verbosity=2).run(
+        unittest.TestSuite(load_tests()))
     for f in glob.glob("%s.py[oc]" % op.splitext(PROGFILE)[0]):
-        os.remove(f) 
-
+        os.remove(f)
