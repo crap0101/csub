@@ -10,7 +10,7 @@ import re
 import sys
 import os
 import os.path as op
-import glob
+from glob import glob as gglob
 import copy
 import random
 import inspect
@@ -32,11 +32,15 @@ CWD = op.dirname(op.realpath(__file__))
 
 class TempFileTest (unittest.TestCase):
 
+    def tearDown (self):
+        for path in gglob(op.join(tempfile.gettempdir(), "*.csub-backup")):
+            os.remove(path)
+
     def testTempFileObjects (self):
         tmp_1 = csub.TempFile(None)
         tmp_2 = csub.TempFile(sys.stdin)
         tmp_others = [csub.TempFile(f)
-                      for f in glob.glob(op.join(CWD, DATA_DIR, '*.srt'))]
+                      for f in gglob(op.join(CWD, DATA_DIR, '*.srt'))]
         self.assertTrue(hasattr(tmp_1, '_fake'))
         self.assertTrue(hasattr(tmp_2, '_fake'))
         for tmpf in tmp_others:
@@ -85,7 +89,7 @@ class TempFileTest (unittest.TestCase):
                     'input':None,'output':None,
                     'prog':PROGFILE}
         for subfile in itertools.chain(
-            glob.glob(op.join(CWD, DATA_DIR, 'test*.srt'))):
+            gglob(op.join(CWD, DATA_DIR, 'test*.srt'))):
             with open(subfile) as f:
                 orig = f.read()
             for cmd in commands:
@@ -112,7 +116,7 @@ class TempFileTest (unittest.TestCase):
                     'input':None,'output':None,
                     'prog':PROGFILE}
         for subfile in itertools.chain(
-            glob.glob(op.join(CWD, DATA_DIR, 'test*.sub'))):
+            gglob(op.join(CWD, DATA_DIR, 'test*.sub'))):
             with open(subfile) as f:
                 orig = f.read()
             for cmd in commands:
@@ -142,7 +146,7 @@ class TempFileTest (unittest.TestCase):
                     'input':None,'output':None,
                     'prog':PROGFILE}
         for subfile in itertools.chain(
-            glob.glob(op.join(CWD, DATA_DIR, 'test*.ass'))):
+            gglob(op.join(CWD, DATA_DIR, 'test*.ass'))):
             with open(subfile) as f:
                 orig = f.read()
             for cmd in commands:
@@ -176,7 +180,7 @@ class TestCommandLine (unittest.TestCase):
                     'output': None,
                     'prog': PROGFILE}
         for s in itertools.chain(
-            glob.glob(op.join(CWD, DATA_DIR, 'test*.[sa][rus][tsb]'))):
+            gglob(op.join(CWD, DATA_DIR, 'test*.[sa][rus][tsb]'))):
             with tempfile.NamedTemporaryFile() as out:
                 o = out.name
             with open(s) as f:
@@ -197,6 +201,7 @@ class TestCommandLine (unittest.TestCase):
                 with open(s) as f:
                     self.assertEqual(f.read(), orig,
                         "original sub file modified! ARGGGGH!!!")
+            os.remove(o)
 
 
 class MicroDVDFIleTest (unittest.TestCase):
@@ -515,9 +520,8 @@ class SrtTimeTransformTest (unittest.TestCase):
         self.subs.set_delta(hours, mins, secs, ms, 0)
         h, m, s, ms = list(
             map(int, self.subs.match_time(string_time).group(1, 2, 3, 4)))
-        secs, ms = self.subs.new_time_tuple(h, m, s, ms)
-        nh, nm, ns = self.subs.times_from_secs(secs)
-        return self.subs.string_format % (nh, nm, ns, ms)
+        return self.subs.string_format % self.subs.times_from_secs(
+            self.subs.new_time(h, m, s, ms))
 
     def random_time (self, orig_time_string):
         _r = random.randint
@@ -556,6 +560,7 @@ class SrtTimeTransformTest (unittest.TestCase):
 
 
 class AssFileTest (unittest.TestCase):
+
     def testAssTimeTransform (self):
         subtitles = (ASS_FAKESUB_1,ASS_FAKESUB_2_OK_MISC,)
         _neg = operator.neg
@@ -585,7 +590,7 @@ class AssFileTest (unittest.TestCase):
         subtitles = (ASS_FAKESUB_1,ASS_FAKESUB_2_OK_MISC,)
         _neg = operator.neg
         _r = random.randint
-        for subfile in glob.glob(op.join(CWD, DATA_DIR, 'test*.ass')):
+        for subfile in gglob(op.join(CWD, DATA_DIR, 'test*.ass')):
             with open(subfile, 'r') as infile:
                 outfile = io.StringIO()
                 inst = csub.AssSub(infile, outfile)
@@ -629,7 +634,7 @@ class AssFileTest (unittest.TestCase):
                      ASS_FAKESUB_4_FAIL_TIME_H,
                      ASS_FAKESUB_5_FAIL_TIME_H,
                      ASS_FAKESUB_6_FILE_TIME_IF_NOT_B,)
-        for subfile in glob.glob(op.join(CWD, DATA_DIR, 'fail*.ass')):
+        for subfile in gglob(op.join(CWD, DATA_DIR, 'fail*.ass')):
             with open(subfile, 'r') as infile:
                 outfile = io.StringIO()
                 inst = csub.AssSub(infile, outfile)
@@ -656,7 +661,7 @@ class AssFileTest (unittest.TestCase):
 class MiscTest (unittest.TestCase):
     def testClose(self):
         to_close = [open(file) for file in
-                    glob.glob(op.join(CWD, DATA_DIR, '[a-z]*.srt'))]
+                    gglob(op.join(CWD, DATA_DIR, '[a-z]*.srt'))]
         no_close = [sys.stdin, sys.stdout, sys.stderr]
         csub.close_files(to_close)
         for file in to_close:
@@ -667,7 +672,7 @@ class MiscTest (unittest.TestCase):
 
     def testSkip(self):
         _r = random.randint
-        for file in glob.glob(op.join(CWD, DATA_DIR, '[a-z]*.srt')):
+        for file in gglob(op.join(CWD, DATA_DIR, '[a-z]*.srt')):
             for mode in ('r','rb'):
                 with open(file, mode=mode) as sub:
                     _bytes = _r(0, len(sub.read())-1)
@@ -678,7 +683,7 @@ class MiscTest (unittest.TestCase):
                     self.assertEqual(readed, sub.read(_bytes))
 
     def testGoodEncoding(self):
-        files = glob.glob(op.join(CWD, DATA_DIR, '_enc_*.srt'))
+        files = gglob(op.join(CWD, DATA_DIR, '_enc_*.srt'))
         for file in files:
             enc = re.match('_enc_([-\w]+)\..*$', op.basename(file)).group(1)
             with open(file, encoding=enc) as fin:
@@ -690,27 +695,29 @@ class MiscTest (unittest.TestCase):
             with open(file, 'rb') as fin_t:
                 with open(_out, 'rb') as fout_t:
                     self.assertEqual(fin_t.read(), fout_t.read())
+            os.remove(_out)
 
     def testFailEncoding(self):
-       _f = ['_enc_ISO-8859-15.srt', '_enc_utf-8.srt']
-       files = [op.join(CWD, DATA_DIR, f) for f in _f]
-       enc = 'us-ascii'
-       for file in files:
-           for err in ('strict', 'replace', 'ignore'):
-               with open(file, encoding=enc, errors=err) as fin:
-                   with tempfile.NamedTemporaryFile() as _fout:
-                       _out = _fout.name
-                   with open(_out,mode='w',encoding=enc,errors=err) as fout:
-                       inst = csub.SrtSub(fin, fout)
-                       if err == 'strict':
-                           self.assertRaises(UnicodeDecodeError, inst.main)
-                       else:
-                           with open(file, 'rb') as i, open(_out,'rb') as o:
-                               self.assertNotEqual(i.read(),o.read())
+        _f = ['_enc_ISO-8859-15.srt', '_enc_utf-8.srt']
+        files = [op.join(CWD, DATA_DIR, f) for f in _f]
+        enc = 'us-ascii'
+        for file in files:
+            for err in ('strict', 'replace', 'ignore'):
+                with open(file, encoding=enc, errors=err) as fin:
+                    with tempfile.NamedTemporaryFile() as _fout:
+                        _out = _fout.name
+                    with open(_out,mode='w',encoding=enc,errors=err) as fout:
+                        inst = csub.SrtSub(fin, fout)
+                        if err == 'strict':
+                            self.assertRaises(UnicodeDecodeError, inst.main)
+                        else:
+                            with open(file, 'rb') as i, open(_out,'rb') as o:
+                                self.assertNotEqual(i.read(),o.read())
+                os.remove(_out)
                                
     def testLookupEncoding(self):
         fake_encs = ['us-asciiuga', 'utf-otto', 'foo-bar-baz']
-        files = glob.glob(op.join(CWD, DATA_DIR, '_enc_*.srt'))
+        files = gglob(op.join(CWD, DATA_DIR, '_enc_*.srt'))
         cmdline = "{exe} {prog} -i {fin} -o {fout} -t srt -e {enc}"
         cmd_dict = {'exe':PYTHON_EXE, 'prog':PROGFILE, 'enc':None,}
         for file in files:
@@ -723,6 +730,7 @@ class MiscTest (unittest.TestCase):
             pipe = sbp.Popen(cmd, stdout=sbp.PIPE, stderr=sbp.PIPE)
             pipe.communicate()
             self.assertEqual(pipe.returncode, 0, "%s" % (cmd))
+            os.remove(cmd_dict['fout'])
         for enc in fake_encs:
             cmd_dict['enc'] = enc
             cmd = shlex.split(cmdline.format(**cmd_dict))
@@ -744,6 +752,47 @@ class MiscTest (unittest.TestCase):
             for i in range(e, e+e):
                 self.assertFalse(ns.check_range_to_edit(i))
 
+    def testChangeFramerate (self):
+        cwr = itertools.combinations_with_replacement
+        rint = random.randint
+        rates = [random.randint(20,30) for _ in range(50)]
+        rates.extend(i+round(random.random(),3) for i in rates[:])
+        ns = csub.Subtitle()
+        for i, (old, new) in enumerate(cwr(rates,2)):
+            us = i % 2
+            md = csub.MicroDVD(None, None, frames=old, use_secs=us)
+            md.change_framerate(old, new)
+            ns.change_framerate(old, new)
+            ht1, mt1, *r = _t1 = tuple(rint(0, x) for x in (5, 59, 59, 999))
+            nsnt = ns.new_time(*_t1)
+            ht2, mt2, *r = _t2 = tuple(ns.times_from_secs(nsnt))
+            md_ht2, md_mt2, *r = mdnt = md.new_time(_t1)
+            if old == new:
+                for val, x,y in zip("hmsM", _t1, _t2):
+                    self.assertAlmostEqual(
+                        x, y, delta=0.1, msg=("ns:{v}t1,{v}t2 [framerates: "
+                                              "{:.3f},{:.3f}] ({},{})".format(
+                                old, new, _t1, _t2, v=val)))
+                for val, x,y in zip('hmsM', _t1, mdnt):
+                    self.assertAlmostEqual(
+                        x, y, delta=0.1,msg=(
+                                "ns:_t1,mdnt ({v}) use_secs: {}, "
+                                "[framerates: {:.3f},{:.3f}]".format(
+                                    us, old, new, v=val)))
+            else:
+                of = ns.delta_framerate
+                ns.change_framerate(new, old)
+                nf = ns.delta_framerate
+                nsnt2 = ns.times_from_secs(ns.new_time(*_t2))
+                self.assertAlmostEqual(
+                                csub.Subtitle().new_time(*_t1),
+                                csub.Subtitle().new_time(*nsnt2), delta=0.1)
+                md.change_framerate(new, old)
+                mdnt2 = md.new_time(mdnt)
+                self.assertAlmostEqual(
+                                csub.Subtitle().new_time(*_t1),
+                                csub.Subtitle().new_time(*mdnt2), delta=0.1)
+
 
 def load_tests():
     loader = unittest.TestLoader()
@@ -764,5 +813,5 @@ if __name__ == '__main__':
         op.split(op.dirname(op.realpath(__file__)))[0], 'csub.py')
     unittest.TextTestRunner(verbosity=2).run(
         unittest.TestSuite(load_tests()))
-    for f in glob.glob("%s.py[oc]" % op.splitext(PROGFILE)[0]):
+    for f in gglob("%s.py[oc]" % op.splitext(PROGFILE)[0]):
         os.remove(f)

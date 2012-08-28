@@ -260,8 +260,7 @@ Dialogue: 0,0:04:33:33,0:04:34:87,Default,,0000,0000,0000,,Il vero Elvis.
 Dialogue: 0,0:04:35.09,0:04:38.08,Default,,0000,0000,0000,,Non quello stronzo grasso che l'ha preso in ostaggio e l'ha mangiato.
 """
 
-ASS_FAKESUB_2_OK_MISC = """
-Dialogue: 0,0:08:47.19,0:08:50.97,Default,,0000,0000,0000,,Sapete, per quelli di voi che se la prendono per una cazzo di battuta.
+ASS_FAKESUB_2_OK_MISC = """Dialogue: 0,0:08:47.19,0:08:50.97,Default,,0000,0000,0000,,Sapete, per quelli di voi che se la prendono per una cazzo di battuta.
 Dialogue: 0,0:09:19.61,0:09:22.99,Default,,0000,0000,0000,,Detto questo, per me la religione è finita, cazzo!
 Dialogue: 0,0:09:02.35,0:09:05.32,Default,,0000,0000,0000,,Basta, è fottutamente finita, amici,
 Dialogue: 0,1:09:05.55,1:09:08.22,Default,,0000,0000,0000,,è finita, cazzo!
@@ -277,8 +276,7 @@ Dialogue: 0,0:09:13.12,0:09:16.41,Default,,0000,0000,0000,,"Ok, ragazzi, ve lo m
 Dialogue: 0,0:09:57.43,0:09:59.06,Default,,0000,0000,0000,,Fottuti cazzoni!
 """
 
-ASS_FAKESUB_3_FAIL_TIME = """
-Dialogue: 0,0:06:54.55,0:06:57.83,Default,,0000,0000,0000,,Avete visto il funerale del Papa? Un funerale tranquillo, lo voleva semplice.
+ASS_FAKESUB_3_FAIL_TIME = """Dialogue: 0,0:06:54.55,0:06:57.83,Default,,0000,0000,0000,,Avete visto il funerale del Papa? Un funerale tranquillo, lo voleva semplice.
 Dialogue: 0,0:06:59.64,0:07:01.52,Default,,0000,0000,0000,,Cazzo, era tipo "Ben Hur", vero?
 Dialogue: 0,0:07:04.73,0:07:07.09,Default,,0000,0000,0000,,Migliaia di pedofili in velluto rosso.
 Dialogue: 0,0:07:20.02,0:07:21.81,Default,,0000,0000,0000,,In realtà era morto da un po'.
@@ -287,20 +285,17 @@ Dialogue: 0,0:07:26.03,0:07:27.86,Default,,0000,0000,0000,,Ma non avevano scelto
 Dialogue: 0,0:07:27.93,0:07:30.136,Default,,0000,0000,0000,,il piccolo fascista fottuto, quindi...
 """
 
-ASS_FAKESUB_4_FAIL_TIME_H = """
-Dialogue: 0,0:07:31.07,0:07:33.38,Default,,0000,0000,0000,,Il piccolo Benedetto della fottuta Hitler Jugend.
+ASS_FAKESUB_4_FAIL_TIME_H = """Dialogue: 0,0:07:31.07,0:07:33.38,Default,,0000,0000,0000,,Il piccolo Benedetto della fottuta Hitler Jugend.
 Dialogue: 0,11:07:35.58,0:07:38.18,Default,,0000,0000,0000,,Stavano aspettando che il suo nome salisse in cima alla lista.
 """
 
-ASS_FAKESUB_5_FAIL_TIME_H = """
-Dialogue: 0,0:07:38.35,0:07:41.00,Default,,0000,0000,0000,,Quindi lo hanno trascinato in giro su quella sedia per un paio d'anni.
+ASS_FAKESUB_5_FAIL_TIME_H = """Dialogue: 0,0:07:38.35,0:07:41.00,Default,,0000,0000,0000,,Quindi lo hanno trascinato in giro su quella sedia per un paio d'anni.
 Dialogue: 0,0:07:43.13,11:07:45.19,Default,,0000,0000,0000,,Lo hanno impagliato con i giornali della domenica...
 Dialogue: 0,0:07:46.49,0:07:48.92,Default,,0000,0000,0000,,...due gesuiti dietro di lui gli muovevano la testa...
 Dialogue: 0,0:08:08.73,0:08:12.03,Default,,0000,0000,0000,,Oh, dovete tenerli d'occhio, quei fottuti.
 """
 
-ASS_FAKESUB_6_FILE_TIME_IF_NOT_B = """
-Dialogue: 0,0:08:35.74,0:08:40.15,Default,,0000,0000,0000,,Nessun bambino è stato molestato nella produzione di questo spettacolo!
+ASS_FAKESUB_6_FILE_TIME_IF_NOT_B = """Dialogue: 0,0:08:35.74,0:08:40.15,Default,,0000,0000,0000,,Nessun bambino è stato molestato nella produzione di questo spettacolo!
 Dialogue: 0,0:08:41.95,-1:08:43.35,Default,,0000,0000,0000,,Nessuno è stato ferito.
 Dialogue: 0,0:08:43.44,0:08:46.27,Default,,0000,0000,0000,,E non sono state usate vignette islamiche!
 """

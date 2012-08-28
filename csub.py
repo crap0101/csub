@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-VERSION = '1.2_20111023'
+VERSION = '1.2_20120828'
 
 """csub {0} - utility to synchronize subtitle files
 
@@ -156,6 +156,9 @@ def get_parser():
     s_parser.add_argument("-b", "--back-to-the-future",
         action="store_true", dest="unsafe_time_mode", default=False,
         help="unsafe time mode. Don't get errors for negative timecodes.")
+    s_parser.add_argument('-c', '--change-framerate',
+        dest='change_framerate', default=False, nargs=2, type=float,
+        metavar=('OLD', 'NEW'), help='change framerate from OLD to NEW')
     s_parser.add_argument("-H", "--hours",
         type=int, dest="hour", default=0, metavar="NUMBER",
         help="change the hours values by NUMBER.")
@@ -229,6 +232,8 @@ def get_parser():
 class TempFile:
     """Class to manage temp file (using tmpfile's mkstemp)."""
     def __init__ (self, in_file, options=None):
+        # NOTE: opts used in the test suite to remove backup files,
+        # if change here, change there too.
         self.opts = {'suffix': '.csub-backup',
                      'prefix': 'subtitle_',
                      'text': True,}
@@ -316,18 +321,20 @@ class Subtitle:
         self.STRING_FORMAT = str_format
         self.RE_MATCH_TIME = re.compile(re_pattern)
         self.RE_MATCH_NUMBER = re.compile('^-{0,1}\d+$')
-        self.MAX_H = 3600
-        self.MAX_MIN = 60
-        self.MAX_HNDRS = 100 # for SubStation Alpha
-        self.MAX_MS = 1000
-        self.delta_hour = self.delta_min = self.delta_sec = 0
-        self.delta_ms = self.delta_sub_num = 0
+        self.MAX_H = 3600.0
+        self.MAX_MIN = 60.0
+        self.MAX_HNDRS = 100.0 # for SubStation Alpha
+        self.MAX_MS = 1000.0
+        self.delta_hour = self.delta_min = self.delta_sec = 0.0
+        self.delta_ms = 0.0
+        self.delta_framerate = 1.0
+        self.delta_sub_num = 0
         self.IS_BLOCK = True
         self.IS_WARN = False
         self.IN_RANGE = True
         self.check_range_to_edit = self.edit_range()
         self.actual_numline = 0
-        self.stretch_left = self.stretch_right = 0
+        self.stretch_left = self.stretch_right = 0.0
 
     @property
     def stretch (self):
@@ -335,6 +342,9 @@ class Subtitle:
     @stretch.setter
     def stretch (self, pair):
         self.stretch_left, self.stretch_right = pair
+
+    def change_framerate (self, old, new):
+        self.delta_framerate = float(new)/float(old)
 
     @staticmethod
     def edit_range(start=None, stop=None):
@@ -357,7 +367,7 @@ class Subtitle:
         self.delta_ms = ms
         self.delta_sub_num = sub_number
 
-    def set_subs_range(self, start=None, end=None):
+    def set_subs_range (self, start=None, end=None):
         """Set blocks range to edit, from `start' to `end' (excluded)."""
         self.check_range_to_edit = self.edit_range(start, end)
 
@@ -395,19 +405,15 @@ class Subtitle:
         else:
             return int(num_str)
 
-    def new_time_tuple (self, hour, min_, sec, ms):
+    def new_time (self, hour, min_, sec, ms):
         """
-        Returns a tuple of (seconds, ms)
-        updated according to the delta.
+        Returns the new time (in seconds) according to the delta.
         """
-        total_sec = sum(((hour + self.delta_hour) * self.MAX_H,
-                         (min_ + self.delta_min) * self.MAX_MIN,
-                         sec + self.delta_sec))
-        new_ms = ms + self.delta_ms
-        if new_ms < 0 or new_ms >= self.MAX_MS:
-            sec_to_add, new_ms = divmod(new_ms, self.MAX_MS)
-            total_sec += sec_to_add
-        return total_sec, abs(new_ms)
+        return sum(((hour + self.delta_hour) * self.MAX_H,
+                    (min_ + self.delta_min) * self.MAX_MIN,
+                    sec + self.delta_sec,
+                    ((ms + self.delta_ms) / self.MAX_MS)
+                   )) * self.delta_framerate
 
     def parse (self, lines, itertools_cycle_iterator):
         """Iterate over subtitle's *lines*, using
@@ -418,13 +424,15 @@ class Subtitle:
         for line, self.actual_numline in zip(lines, itertools.count(1)):
             yield "%s\n" % get_func(line)
 
-    def times_from_secs (self, total_sec):
+    def times_from_secs (self, seconds):
         """
-        Returns a tuple of (hour, minutes, secs)
+        Returns a tuple of (hour, minutes, secs, ms)
         from a time expressed in seconds.
         """
-        hour, m = divmod(total_sec, self.MAX_H)
-        return hour, m / self.MAX_MIN, total_sec % self.MAX_MIN
+        hour, _ = divmod(seconds, self.MAX_H)
+        m, _ = divmod(_, self.MAX_MIN)
+        ms, s = math.modf(_)
+        return hour, m, s, round(ms*self.MAX_MS)
 
 
 class MicroDVD (Subtitle):
@@ -434,7 +442,7 @@ class MicroDVD (Subtitle):
     def __init__ (self, file_in, file_out, frames=25,
                   unsafe_time_mode=False, use_secs=False):
         """file_in and file_out must be file-like objects."""
-        str_fmt = '{{{start}}}{{{end}}}{rest}\n'
+        str_fmt = '{{{start:.0f}}}{{{end:.0f}}}{rest}\n'
         reg = '^{(\d+)}{(\d+)}(.*)$'
         reg_unsafe = '^{(-{0,1}\d+)}{(-{0,1}\d+)}(.*)$'
         super().__init__(str_fmt, reg if not unsafe_time_mode else reg_unsafe)
@@ -446,17 +454,18 @@ class MicroDVD (Subtitle):
 
     def frame_use_secs(self, frame):
         secs, r = divmod(frame, self.frames)
-        return r + int(sum((self.delta_hour * self.MAX_H,
+        return r + (sum((self.delta_hour * self.MAX_H,
                             self.delta_min * self.MAX_MIN,
                             secs + self.delta_sec,
                             self.delta_ms))
-                       * self.frames)
+                       * self.frames
+                       * self.delta_framerate)
 
     def _new_time(self, frames):
         return list(self.frame_use_secs(f) for f in frames)
 
     def _new_frames(self, frames):
-        return list(x + self.delta_frames for x in frames)
+        return [(x + self.delta_frames) * self.delta_framerate for x in frames]
 
     new_time = _new_frames
 
@@ -520,13 +529,13 @@ class AssSub (Subtitle):
             int, self.time_reg.match(time_string).groups()))
         return self.check_range_to_edit(h * self.MAX_H + m * self.MAX_MIN + s)
 
-    def new_time (self, time_string, sec_sep, stretch):
-        """Return a string representing the the subtitle time."""
+    def new_time_string (self, time_string, sec_sep, stretch):
+        """Return a string representing the subtitle time."""
         h, m, s, hndrs = list(map(
             int, self.time_reg.match(time_string).groups()))
-        total_secs, hndrs = self.new_time_tuple(h, m, s, hndrs + stretch)
-        h, m, s = self.times_from_secs(total_secs)
-        return "%d:%02d:%02d%s%02d" % (h, m, s, sec_sep, hndrs)
+        return '{:.0f}:{:02.0f}:{:02.0f}{sep}{:02.0f}'.format(
+            *self.times_from_secs(self.new_time(h, m, s, hndrs + stretch)),
+             sep=sec_sep)
 
     def parse_line (self, line):
         """
@@ -540,9 +549,10 @@ class AssSub (Subtitle):
                 match = self.reg.match(line)
                 init, start, start_sep, end, end_sep, rest = match.groups()
                 if self._is_in_range(start):
-                    new_start = self.new_time(
+                    new_start = self.new_time_string(
                         start, start_sep, self.stretch_left)
-                    new_end = self.new_time(end, end_sep, self.stretch_right)
+                    new_end = self.new_time_string(
+                        end, end_sep, self.stretch_right)
                     line = ','.join((init, new_start, new_end, rest))
             except ValueError as err:
                 raise MismatchTimeError(
@@ -554,7 +564,7 @@ class AssSub (Subtitle):
                     "ERR LINE IS: %s" % line)
         return line
 
-    def set_delta(self, hour=0, min_=0, sec=0, hndrs=0, *not_used):
+    def set_delta (self, hour=0, min_=0, sec=0, hndrs=0, *not_used):
         super(AssSub, self).set_delta(hour, min_, sec)
         self.delta_ms = hndrs
 
@@ -623,17 +633,11 @@ class SrtSub (Subtitle):
             raise MismatchTimeError("[at line %d] '%s' (in %s)"
                  % (self.actual_numline, time_string, "time_block"))
         h, m, s, ms = list(map(int, self.match_time(start).group(1, 2, 3, 4)))
-        s += self._sl
-        ms += self._ml
-        sec, ms = self.new_time_tuple(h, m, s, ms)
-        nh, nm, ns = self.times_from_secs(sec)
-        new_start = self.string_format % (nh, nm, ns, ms)
+        new_start = self.string_format % self.times_from_secs(
+            self.new_time(h, m, s+self._sl, ms+self._ml))
         h, m, s, ms = list(map(int, self.match_time(end).group(1, 2, 3, 4)))
-        s += self._sr
-        ms += self._mr
-        sec, ms = self.new_time_tuple(h, m, s, ms)
-        nh, nm, ns = self.times_from_secs(sec)
-        new_end = self.string_format % (nh, nm, ns, ms)
+        new_end = self.string_format % self.times_from_secs(
+            self.new_time(h, m, s+self._sr, ms+self._mr))
         return self.time_sep.join((new_start, new_end))
 
     @iterdec(multicall=True)
@@ -647,8 +651,7 @@ class SrtSub (Subtitle):
         cycle = self.make_iter_blocks(self.num_block,
                                       self.time_block,
                                       self.text_block)
-        new_lines = self.parse(self.file_in, cycle)
-        self.file_out.writelines(new_lines)
+        self.file_out.writelines(self.parse(self.file_in, cycle))
         if self.IS_BLOCK and self.IS_WARN:
             warnings.warn("Incomplete block at EOF", IncompleteBlockError)
 
@@ -738,6 +741,8 @@ if __name__ == '__main__':
             save_on_error(in_file, out_file, tmpfile)
             parser.error('invalid --stretch option: {val} [{err}]'.format(
                 val=opts.stretch, err=str(e)))
+    if opts.change_framerate:
+        newsub.change_framerate(*opts.change_framerate)
     try:
         newsub.main()
     except (BadFormatError, MismatchTimeError,
