@@ -151,7 +151,8 @@ def get_parser():
         help="write the subtitle in FILE (default: stdout).")
     io_parser.add_argument("-s", "--skip-bytes",
         dest="skip_bytes", type=int, metavar="NUM",
-        help="skip the first NUM file's bytes (must be an integer >= 0).")
+        help="""skip the first NUM file's bytes (must be an integer >= 0).
+        Required in certain situations, e.g. to skip use(full|less) BOM.""")
     io_parser.add_argument("-t", "--type",
         dest="subtitle_type", metavar="TYPE",
         help="subtitle file type: (ass|ssa, srt, sub|microdvd).")
