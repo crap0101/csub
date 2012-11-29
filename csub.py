@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-VERSION = '1.2_20120828'
+VERSION = '1.2_20121129'
 
 """csub {0} - utility to synchronize subtitle files
 
@@ -38,21 +38,30 @@ Examples:
 # I M P O R T S #
 #################
 
-import os
-import re
-import sys
-import math
-import operator
-import itertools
-import warnings
+import atexit
 import argparse
 import codecs
-from tempfile import mkstemp
+import itertools
+import math
+import operator
+import os
+import re
 from string import Template
+import sys
+import tempfile
+import warnings
 
 #####################
 # F U N C T I O N S #
 #####################
+
+def clean_backup (tmpfile):
+    if tmpfile.filepath:
+        try:
+            os.remove(tmpfile.filepath)
+        except Exception as err:
+            warnings.warn("Warning: can't remove backup file '{}': {}".format(
+                    tmpfile.filepath, err))
 
 def close_files(files):
     """Close any file in *files* if not a tty or already closed."""
@@ -104,7 +113,7 @@ def TempFileManager (methods):
         def inner2 (file_stream, options=None):
             if file_stream and file_stream != sys.stdin:
                 return cls(file_stream, options)
-            dict_ = {'_fake': True}
+            dict_ = {'filepath': None}
             for method in methods:
                 dict_[method] = lambda *args: None
                 dict_[method].__name__ = method
@@ -218,6 +227,10 @@ def get_parser():
         help="movie's frame rate (eg. 25, 29.97, 23.976) (default: 25.")
     # other options
     m_parser = parser.add_argument_group('Misc Options')
+    m_parser.add_argument("-T", "--tempdir",
+        dest="tempdir", metavar='PATH', default=tempfile.gettempdir(),
+        help="""Set the temporary directory (must exists) where store backup
+        files (default=%(default)s.""")
     m_parser.add_argument("-w", "--warn",
         action="store_true", dest="is_warn", default=False,
         help="enable warnings.")
@@ -239,7 +252,7 @@ class TempFile:
                      'text': True,}
         self.opts.update(options or {})
         self.in_file = in_file
-        self.fd, self.filepath = mkstemp(**self.opts)
+        self.fd, self.filepath = tempfile.mkstemp(**self.opts)
         with open(self.in_file, 'rb') as _in:
             self.fd_max_pos = os.write(self.fd, _in.read())
         self.seek(0, 0)
@@ -661,9 +674,6 @@ class SrtSub (Subtitle):
 ###########
 
 if __name__ == '__main__':
-    in_file = sys.stdin
-    out_file = sys.stdout
-    tmpfile = TempFile(None)
     parser = get_parser()
     opts = parser.parse_args()
     opt_err = Template("Can't use $what with $subtype subtitles\n")
@@ -680,6 +690,10 @@ if __name__ == '__main__':
         print('{prog}: {err}'.format(prog=sys.argv[0], err=le),
               file=sys.stderr)
         sys.exit(1)
+    if not (os.path.exists(opts.tempdir) and os.path.isdir(opts.tempdir)):
+        parser.error("tempdir must be an existing directory!")
+    else:
+        tempfile.tempdir = opts.tempdir
     if not opts.subtitle_type:
         parser.error("subtitle type (-t/--type) must be specified!")
     if opts.infile and not os.path.isfile(opts.infile):
@@ -690,13 +704,18 @@ if __name__ == '__main__':
                 parser.error(
                     opt_err.substitute(
                         subtype=opts.subtitle_type, what=s))
+    in_file = sys.stdin
+    out_file = sys.stdout
     if opts.infile == opts.outfile and all((opts.infile, opts.outfile)):
         tmpfile = TempFile(opts.infile)
+        atexit.register(clean_backup, tmpfile)
         in_file = open(tmpfile.filepath, 'r',
                        encoding=opts.encoding, errors=opts.enc_err)
         out_file = open(opts.infile, 'w',
                         encoding=opts.encoding, errors=opts.enc_err)
     else:
+        tmpfile = TempFile(None)
+        atexit.register(clean_backup, tmpfile)
         if opts.infile:
             in_file = open(opts.infile, "r",
                            encoding=opts.encoding, errors=opts.enc_err)

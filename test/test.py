@@ -41,8 +41,8 @@ class TempFileTest (unittest.TestCase):
         tmp_2 = csub.TempFile(sys.stdin)
         tmp_others = [csub.TempFile(f)
                       for f in gglob(op.join(CWD, DATA_DIR, '*.srt'))]
-        self.assertTrue(hasattr(tmp_1, '_fake'))
-        self.assertTrue(hasattr(tmp_2, '_fake'))
+        self.assertTrue(hasattr(tmp_1, 'filepath'))
+        self.assertTrue(hasattr(tmp_2, 'filepath'))
         for tmpf in tmp_others:
             self.assertFalse(hasattr(tmpf, '_fake'))
         tmp_3 = tmp_others[0]
