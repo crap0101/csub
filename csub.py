@@ -230,7 +230,7 @@ def get_parser():
     m_parser.add_argument("-T", "--tempdir",
         dest="tempdir", metavar='PATH', default=tempfile.gettempdir(),
         help="""Set the temporary directory (must exists) where store backup
-        files (default=%(default)s.""")
+        files (default '%(default)s').""")
     m_parser.add_argument("-w", "--warn",
         action="store_true", dest="is_warn", default=False,
         help="enable warnings.")
