@@ -155,6 +155,7 @@ def get_parser():
         Required in certain situations, e.g. to skip use(full|less) BOM.""")
     io_parser.add_argument("-t", "--type",
         dest="subtitle_type", metavar="TYPE",
+        choices=('ass','ssa', 'srt', 'sub','microdvd'),
         help="subtitle file type: (ass|ssa, srt, sub|microdvd).")
     # subtiles options
     s_parser = parser.add_argument_group('Subtitle Options')
