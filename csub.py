@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-VERSION = '1.2_20121129'
+VERSION = '1.2_20140807'
 
 """csub {0} - utility to synchronize subtitle files
 
@@ -149,6 +149,9 @@ def get_parser():
     io_parser.add_argument("-o", "--output-file",
         dest="outfile", metavar="FILE",
         help="write the subtitle in FILE (default: stdout).")
+    io_parser.add_argument("-O", "--same-file",
+        dest="same_file", metavar="FILE",
+        help="use %(metavar)s as both input and output file.")
     io_parser.add_argument("-s", "--skip-bytes",
         dest="skip_bytes", type=int, metavar="NUM",
         help="""skip the first NUM file's bytes (must be an integer >= 0).
@@ -686,6 +689,14 @@ if __name__ == '__main__':
     if opts.info:
         print(__doc__)
         sys.exit(0)
+    if opts.same_file:
+        if any((opts.infile, opts.outfile)):
+            print('{p}: -O/--same-file can not be used in conjunction with '
+                  '-i/--input-file or -o/--output-file'.format(p=sys.argv[0]),
+                  file=sys.stderr)
+            sys.exit(1)
+        else:
+            opts.infile = opts.outfile = opts.same_file
     try:
         codecs.lookup(opts.encoding.lower())
     except LookupError as le:

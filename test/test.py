@@ -19,6 +19,7 @@ import io
 import itertools
 import subprocess as sbp
 import shlex
+import shutil
 import operator
 import platform
 import tempfile
@@ -193,7 +194,7 @@ class TestCommandLine (unittest.TestCase):
                 cmdline = shlex.split(cmd.format(**cmd_dict))
                 cmdline.extend(next(_ranges))
                 pipe = sbp.Popen(cmdline, stdout=sbp.PIPE, stderr=sbp.PIPE)
-                pipe.communicate()[0]
+                pipe.communicate()
                 retcode = pipe.returncode
                 self.assertEqual(retcode, 0,
                     "Retcode != 0: {ret} | '{cmd}' | {file}".format(
@@ -202,6 +203,59 @@ class TestCommandLine (unittest.TestCase):
                     self.assertEqual(f.read(), orig,
                         "original sub file modified! ARGGGGH!!!")
             os.remove(o)
+
+    def testSameFileOk (self):
+        cmd_fmt = "{exe} {prog} -O {io} -t {type} -m {val}"
+        cmd_dict = {'exe': PYTHON_EXE,
+                    'io': None,
+                    'val': random.randint(-999,999),
+                    'prog': PROGFILE}
+        for s in itertools.chain(
+            gglob(op.join(CWD, DATA_DIR, 'test*.[sa][rus][tsb]'))):
+            with tempfile.NamedTemporaryFile() as out:
+                o = out.name
+            with open(s) as f:
+                orig = f.read()
+            shutil.copyfile(s, o)
+            t = op.splitext(s)[-1][1:]
+            cmd_dict['io'] = o
+            cmd_dict['type'] = t
+            cmdline = shlex.split(cmd_fmt.format(**cmd_dict))
+            pipe = sbp.Popen(cmdline, stdout=sbp.PIPE, stderr=sbp.PIPE)
+            pipe.communicate()
+            retcode = pipe.returncode
+            self.assertEqual(retcode, 0,
+                             "Retcode != 0: {ret} | '{cmd}' | {file}".format(
+                                 ret=retcode, cmd=' '.join(cmdline), file=s))
+            with open(o) as f:
+                if cmd_dict['val'] != 0:
+                    self.assertNotEqual(f.read(), orig,
+                                 "No changes in sub file! ARGGGGH!!!")
+                else:
+                    self.asserttEqual(f.read(), orig,
+                                 "Sub file changed! ARGGGGH!!!")
+            os.remove(o)
+
+    def testSameFileFail (self):
+        commands = [
+            "{exe} {prog} -i {input} -o {output} -t {type} -O {io}",
+            "{exe} {prog} -i {input} -o {output} -t {type} --same-file {io}",
+            "{exe} {prog} -i {input} -O {io} -t {type}",
+            "{exe} {prog} -O {io} -o {output} -t {type}",]
+        cmd_dict = {'exe': PYTHON_EXE,
+                    'input': 'bar',
+                    'output': 'foo',
+                    'io': 'baz',
+                    'type': 'srt',
+                    'prog': PROGFILE}
+        for cmd in commands:
+            cmdline = shlex.split(cmd.format(**cmd_dict))
+            pipe = sbp.Popen(cmdline, stdout=sbp.PIPE, stderr=sbp.PIPE)
+            pipe.communicate()
+            retcode = pipe.returncode
+            self.assertNotEqual(retcode, 0,
+                                "Retcode == 0 (command should be failed "
+                                "instead): {c}".format(c=' '.join(cmdline)))
 
 
 class MicroDVDFIleTest (unittest.TestCase):
