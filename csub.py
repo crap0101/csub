@@ -735,17 +735,6 @@ if __name__ == '__main__':
         if opts.outfile:
             out_file = open(opts.outfile, "w",
                             encoding=opts.encoding, errors=opts.enc_err)
-    if opts.skip_bytes:
-        if opts.skip_bytes < 0:
-            save_on_error(in_file, out_file, tmpfile)
-            parser.error('-s|--skip-byte argument must be a positive value')
-        try:
-            skip_bytes(in_file, opts.skip_bytes)
-        except Exception as e:
-            save_on_error(in_file, out_file, tmpfile)
-            print("{err}: [at line {line}] {msg}\n".format(
-                    err=e.__class__.__name__, line=newsub.actual_numline,
-                    msg=str(e)), file=sys.stderr)
     if opts.subtitle_type == 'srt':
         newsub = SrtSub(in_file, out_file, opts.unsafe_time_mode,
                         opts.unsafe_number_mode, opts.ignore_extra)
@@ -763,6 +752,17 @@ if __name__ == '__main__':
         newsub = AssSub(in_file, out_file, opts.unsafe_time_mode)
         newsub.set_delta(opts.hour, opts.min, opts.sec, opts.ms, opts.num)
     newsub.IS_WARN = opts.is_warn
+    if opts.skip_bytes:
+        if opts.skip_bytes < 0:
+            save_on_error(in_file, out_file, tmpfile)
+            parser.error('-s|--skip-byte argument must be a positive value')
+        try:
+            skip_bytes(in_file, opts.skip_bytes)
+        except Exception as e:
+            save_on_error(in_file, out_file, tmpfile)
+            print("{err}: [at line {line}] {msg}\n".format(
+                    err=e.__class__.__name__, line=newsub.actual_numline,
+                    msg=str(e)), file=sys.stderr)
     try:
         start_sub, end_sub = opts.range.split(':')
         newsub.set_subs_range(int(start_sub) if start_sub else None,
