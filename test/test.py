@@ -765,9 +765,32 @@ class MiscTest (unittest.TestCase):
                         if err == 'strict':
                             self.assertRaises(UnicodeDecodeError, inst.main)
                         else:
+                            inst.main()
                             with open(file, 'rb') as i, open(_out,'rb') as o:
                                 self.assertNotEqual(i.read(),o.read())
                 os.remove(_out)
+
+    def testUtf8sigEncoding(self):
+        file = op.join(CWD, DATA_DIR, '_enc_utf-8-sig.srt')
+        enc = 'utf-8-sig'
+        enc_fail = 'utf-8'
+        # ok
+        with open(file, encoding=enc) as fin:
+            with tempfile.NamedTemporaryFile() as _fout:
+                _out = _fout.name
+            with open(_out,mode='w',encoding=enc) as fout:
+                inst = csub.SrtSub(fin, fout)
+                inst.main()
+            with open(file, 'rb') as i, open(_out,'rb') as o:
+                self.assertEqual(i.read(),o.read())
+        # fail
+        with open(file, encoding=enc_fail) as fin:
+            with tempfile.NamedTemporaryFile() as _fout:
+                _out = _fout.name
+            with open(_out,mode='w',encoding=enc_fail) as fout:
+                inst = csub.SrtSub(fin, fout)
+                self.assertRaises(csub.IndexNumError, inst.main)
+            os.remove(_out)
                                
     def testLookupEncoding(self):
         fake_encs = ['us-asciiuga', 'utf-otto', 'foo-bar-baz']

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-VERSION = '1.2_20140807'
+VERSION = '1.3_20151123'
 
 """csub {0} - utility to synchronize subtitle files
 
@@ -132,9 +132,12 @@ def get_parser():
     # I/O options
     io_parser = parser.add_argument_group('Input and Output')
     io_parser.add_argument("-e", "--encoding",
-        dest="encoding", metavar="NAME", default='utf-8', help="""
+        dest="encoding", metavar="NAME", default='utf-8-sig', help="""
         subtitle encoding to use for reading and writing files.
-        Must match the input file's encoding (default to utf-8).""")
+        Must match the input file's encoding (default to utf-8-sig).
+        If you want to get rid of the BOM in such a marked files use
+        a bare 'utf-8' codec and the -s/--skip option (like -e utf-8 -s1)
+        to delete it.""")
     io_parser.add_argument("-E", "--encode-error",
         dest='enc_err', default='strict', metavar="NAME",
         choices=('strict', 'replace', 'ignore'), help="""
@@ -165,7 +168,7 @@ def get_parser():
     srt_parser = parser.add_argument_group('Subrip (*.srt) Specific Options')
     ass_parser = parser.add_argument_group(
         '(Advanced) SubStation Alpha (*.ass, *.ssa) Specific Options')
-    mdv_parser = parser.add_argument_group('MicoDVD (*.sub) Specific Options')
+    mdv_parser = parser.add_argument_group('MicroDVD (*.sub) Specific Options')
     ## all subtitles
     s_parser.add_argument("-b", "--back-to-the-future",
         action="store_true", dest="unsafe_time_mode", default=False,
