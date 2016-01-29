@@ -85,7 +85,10 @@ class TempFileTest (unittest.TestCase):
                     "{exe} {prog} -i __FAIL__{input} -o {output} -t ass",
                     "{exe} {prog} -i {input} -o {output} -t srt -H foo",
                     "{exe} {prog} -i {input} -o {output} -t srt --not-exist",
-                    "{exe} {prog} -i {input} -o {output} -t srt -m 9999",]
+                    "{exe} {prog} -i {input} -o {output} -t srt -m 9999",
+                    "{exe} {prog} -i {input} -o {output} -t srt -N",
+                    "{exe} {prog} -i {input} -o {output} -t srt -N 1 -r 1:",
+                    "{exe} {prog} -i {input} -o {output} -t srt -N 1 -n 1:",]
         cmd_dict = {'exe':PYTHON_EXE,
                     'input':None,'output':None,
                     'prog':PROGFILE}
@@ -447,6 +450,14 @@ class SrtFileTest (unittest.TestCase):
             sub2 = io.StringIO(sub_string)
             newsub = csub.SrtSub(sub1, sub2)
             self.assertRaises(csub.IndexNumError, newsub.main)
+
+    def testProgressiveNumbers (self):
+        start = random.randint(-111, 111)
+        sub = csub.SrtSub(
+            None, None, make_progressive_num_block=True, start_sub_num=start)
+        for n in range(1000):
+            self.assertEqual(sub.new_sub_num('0'), start + n)
+
 
     def testUnhandledError (self):
         def  get_error (error):

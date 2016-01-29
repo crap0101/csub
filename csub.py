@@ -51,6 +51,12 @@ import sys
 import tempfile
 import warnings
 
+#############
+# CONSTANTS #
+#############
+
+OPT_RANGE = ':'
+
 #####################
 # F U N C T I O N S #
 #####################
@@ -187,7 +193,7 @@ def get_parser():
         type=int, help="""change the milliseconds values by NUMBER.
         (NOTE: this value must be in range -999..999).""")
     s_parser.add_argument("-r", "--range",
-        dest="range", default=':', metavar="START:END", help="""
+        dest="range", default=OPT_RANGE, metavar="START:END", help="""
         apply changes only between START and END (excluded).
         Both START and END can be omitted, in such case changes are applied
         from the beginning (for START) to the end (for END).
@@ -226,6 +232,11 @@ def get_parser():
     srt_parser.add_argument("-n", "--num",
         type=int, dest="num", default=0, metavar="NUMBER",
         help="change the progressive subtitle number by NUMBER.")
+    srt_parser.add_argument("-N", "--make-progressive-num-blocks",
+        type=int, dest="prog_sub_num", default=None, metavar="NUMBER",
+        help="""Change *all* subtitle numbers in progression,
+        starting from NUMBER. Conflicts with options -r and -n, cannot be
+        used at the same time.""")
     ## microDVD
     mdv_parser.add_argument("-f", "--delta-frames",
         type=int, default=0, dest="delta_frames", metavar="NUMBER",
@@ -601,8 +612,10 @@ class SrtSub (Subtitle):
     Inherit from Subtitle.
     """
     def __init__ (self, file_in, file_out, unsafe_time_mode=False,
-                  unsafe_number_mode=False, ignore_extra=False):
+                  unsafe_number_mode=False, ignore_extra=False,
+                  make_progressive_num_block=False, start_sub_num=1):
         """file_in and file_out must be file-like objects."""
+        self.sub_num = start_sub_num
         self.time_sep = " --> "
         self.string_format = "%02d:%02d:%02d,%03d"
         reg_safe =   r'^(\d{2}):(\d{2}):(\d{2}),(\d{3})$'
@@ -614,6 +627,8 @@ class SrtSub (Subtitle):
         self.file_in = file_in
         self.file_out = file_out
         self._sl = self._ml = self._sr = self._mr = 0 # stretch
+        if make_progressive_num_block:
+            self.new_sub_num = self.progressive_num_block
 
     @property
     def stretch (self):
@@ -637,10 +652,20 @@ class SrtSub (Subtitle):
             self._mr = self.stretch_right
 
     @iterdec()
-    def num_block (self, nums_string):
+    def num_block (self, num_string):
         """Check the subtitle's number identifier lines."""
         self.IS_BLOCK = True
-        return self.new_sub_num(nums_string)
+        return self.new_sub_num(num_string)
+
+    def progressive_num_block (self, __ignored_num_str):
+        matched = re.match(self.RE_MATCH_NUMBER, __ignored_num_str.rstrip())
+        if matched is None and not self.unsafe_number_mode:
+            raise IndexNumError(
+                "{} ({})".format(__ignored_num_str, self.sub_num))
+        else:
+            n = self.sub_num
+        self.sub_num += 1
+        return n
 
     @iterdec()
     def time_block (self, time_string):
@@ -700,6 +725,14 @@ if __name__ == '__main__':
             sys.exit(1)
         else:
             opts.infile = opts.outfile = opts.same_file
+    if opts.subtitle_type == 'srt':
+        if ((opts.prog_sub_num is not None)
+            and (opts.num or (opts.range != OPT_RANGE))):
+            co = ('-r/--range', '-n/--number')[bool(opts.num)]
+            print('{}: option -N/--make-progressive-num-blocks'
+                  ' conflicts with {}'.format(
+                      sys.argv[0], co), file=sys.stderr)
+            sys.exit(1)
     try:
         codecs.lookup(opts.encoding.lower())
     except LookupError as le:
@@ -740,7 +773,8 @@ if __name__ == '__main__':
                             encoding=opts.encoding, errors=opts.enc_err)
     if opts.subtitle_type == 'srt':
         newsub = SrtSub(in_file, out_file, opts.unsafe_time_mode,
-                        opts.unsafe_number_mode, opts.ignore_extra)
+                        opts.unsafe_number_mode, opts.ignore_extra,
+                        opts.prog_sub_num != None, opts.prog_sub_num)
         newsub.set_delta(opts.hour, opts.min, opts.sec, opts.ms, opts.num)
     elif opts.subtitle_type in ('sub', 'microdvd'):
         use_secs = any((opts.hour, opts.min, opts.sec, opts.ms))
