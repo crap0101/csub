@@ -28,7 +28,7 @@ Supported formats:
   - MicroDVD (*.sub)
 
 Examples:
-  # reading from stdin and output to stdout ans ass/ssa sub:
+  # reading from stdin and output to stdout an ass/ssa sub:
   ~$ ./prog_name --minutes 3 --seconds -44 --milliseconds -378 -num 2 -t ass
   # read a srt file from 'file_sub.srt' to 'newfile.srt':
   ~$ ./prog_name -t srt -M -1 -S 4 -i film_sub.srt -o newfile.srt
@@ -70,9 +70,9 @@ def clean_backup (tmpfile):
                     tmpfile.filepath, err))
 
 def close_files(files):
-    """Close any file in *files* if not a tty or already closed."""
+    """Close anf flush any file in *files* if not a tty."""
     for file in files:
-        if not file.isatty() and not file.closed:
+        if not file.isatty():
             file.close()
 
 def iterdec (multicall=False):
@@ -105,9 +105,10 @@ def numslice(n, i, keep_sign=False):
     return sign_op(divmod(n, 10**m)[g]) if keep_sign else divmod(n, 10**m)[g]
 
 def save_on_error(infile, outfile, tmpfile):
-    """Save files on error, to preserv data."""
+    """Save files on error, to preserve data."""
+    close_files((in_file, out_file))
     tmpfile.write_back()
-    close_files((in_file, out_file, tmpfile))
+    tmpfile.close()
 
 def skip_bytes(stream, nbytes):
     """Read nbytes from stream and return them."""
@@ -295,6 +296,7 @@ class TempFile:
         return os.lseek(self.fd, pos, how)
 
     def write_back (self):
+        self.seek(0, 0)
         with open(self.in_file, 'wb') as _in:
             _in.write(self.read())
 
