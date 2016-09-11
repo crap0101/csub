@@ -88,7 +88,9 @@ class TempFileTest (unittest.TestCase):
                     "{exe} {prog} -i {input} -o {output} -t srt -m 9999",
                     "{exe} {prog} -i {input} -o {output} -t srt -N",
                     "{exe} {prog} -i {input} -o {output} -t srt -N 1 -r 1:",
-                    "{exe} {prog} -i {input} -o {output} -t srt -N 1 -n 1:",]
+                    "{exe} {prog} -i {input} -o {output} -t srt -N 1 -n 1:",
+                    "{exe} {prog} -i {input} -o {output} -Ip",
+        ]
         cmd_dict = {'exe':PYTHON_EXE,
                     'input':None,'output':None,
                     'prog':PROGFILE}
@@ -458,7 +460,27 @@ class SrtFileTest (unittest.TestCase):
         for n in range(1000):
             self.assertEqual(sub.new_sub_num('0'), start + n)
 
-
+    def testPositioning (self):
+        fakesubs = [SRT_FAKESUB_POSITION]
+        for f in fakesubs:
+            # fail
+            subfail1 = io.StringIO(f)
+            subfail2 = io.StringIO()
+            newsub = csub.SrtSub(subfail1, subfail2)
+            self.assertRaises(csub.MismatchTimeError, newsub.main)
+            # ok
+            subok1 = io.StringIO(f)
+            subok2 = io.StringIO()
+            csub.SrtSub(subok1, subok2, keep_pos=True).main()
+            subok2.seek(0)
+            self.assertEqual(f, subok2.read())
+            # ignore
+            subignore1 = io.StringIO(f)
+            subignore2 = io.StringIO()
+            csub.SrtSub(subignore1, subignore2, ignore_extra=True)
+            subignore2.seek(0)
+            self.assertNotEqual(f, subignore2.read())
+            
     def testUnhandledError (self):
         def  get_error (error):
             def raise_error (*args):

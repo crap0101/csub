@@ -244,6 +244,26 @@ un figlio di puttana faceva ruotare la freccetta
 e mi prendeva a calci in culo, Eddie.
 """
 
+SRT_FAKESUB_POSITION = """1
+00:00:00,142 --> 00:00:02,136 X1:100 X2:100 Y1:100 Y2:100
+- <i>Potremmo essere spacciati.</i>
+- <i>Dark Army.</i>
+
+2
+00:00:01,236 --> 00:00:03,381 x:test position y:test position
+{\an8}NELLE PUNTATE PRECEDENTI DI MR. ROBOT
+
+3
+00:00:02,166 --> 00:00:04,643  x:222 y:345
+<i>Il gruppo di hacker più
+pericoloso del mondo.</i>
+
+4
+00:00:04,673 --> 00:00:07,741
+<i>Se solo pensano che l'FBI stia
+ficcando il naso, siete finiti.</i>
+"""
+
 ASS_FAKESUB_0 = '''Dialogue: 0,0:01:02.25,0:01:04.75,Default,,0000,0000,0000,,Che bello vedervi, è una figata!
 Dialogue: 0,0:01:04.85,0:01:06.77,Default,,0000,0000,0000,,Vi divertirete stasera, è un bello spettacolo.
 Dialogue: 0,0:01:06.80,0:01:10.17,Default,,0000,0000,0000,,È sempre stato bello, se stasera farà schifo potrebbe essere colpa vostra.

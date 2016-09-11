@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-VERSION = '1.3_20151123'
+VERSION = '1.4_20160912'
 
 """csub {0} - utility to synchronize subtitle files
 
@@ -223,13 +223,13 @@ def get_parser():
     srt_parser.add_argument("-B", "--back-to-the-block",
         action="store_true", dest="unsafe_number_mode", default=False,
         help="unsafe number mode. Don't get errors for negative block nums.")
-    srt_parser.add_argument("-I", "--ignore-extra",
+    '''srt_parser.add_argument("-I", "--ignore-extra",
         action="store_true", dest='ignore_extra', default=False,
         help="""ignore extra informations in the time line (like sub position,
         style, ecc. These informations are extensions of the original subrip
         format, so are normally treated as errors; you must use this option
         for parsing such a subtitles.
-        NOTE: Those informations are not kept in the new file.""")
+        NOTE: Those informations are not kept in the new file.""")'''
     srt_parser.add_argument("-n", "--num",
         type=int, dest="num", default=0, metavar="NUMBER",
         help="change the progressive subtitle number by NUMBER.")
@@ -238,6 +238,18 @@ def get_parser():
         help="""Change *all* subtitle numbers in progression,
         starting from NUMBER. Conflicts with options -r and -n, cannot be
         used at the same time.""")
+    srt_parser_extra = srt_parser.add_mutually_exclusive_group()
+    srt_parser_extra.add_argument("-I", "--ignore-extra",
+        action="store_true", dest='ignore_extra', default=False,
+        help="""ignore extra informations in the time line (like sub position,
+        style, etc.). These informations are extensions of the original subrip
+        format, so are normally treated as errors; you must use this option
+        for parsing such a subtitles.
+        NOTE: Those informations are not kept in the new file.""")
+    srt_parser_extra.add_argument("-p", "--preserve-extra",
+        action="store_true", dest='preserve_extra', default=False,
+        help="""preserve extra informations in the time line (like sub position,
+        style, etc.).""")
     ## microDVD
     mdv_parser.add_argument("-f", "--delta-frames",
         type=int, default=0, dest="delta_frames", metavar="NUMBER",
@@ -409,12 +421,14 @@ class Subtitle:
         """Returns an itertools.cycle object for *methods."""
         return itertools.cycle(methods)
 
-    def match_time (self, string_time):
+    def match_time (self, string_time, _re=None):
         """
         Check the time-line and return the matched values
         or raise MismatchTimeError.
+        A custom regex-pattern object can be used instead
+        of the default RE_MATCH_TIME.
         """
-        matched = re.match(self.RE_MATCH_TIME, string_time)
+        matched = re.match(_re or self.RE_MATCH_TIME, string_time)
         if matched is None:
             raise MismatchTimeError(
                 "'%s' (in %s)" % (string_time, "match_time"))
@@ -615,17 +629,23 @@ class SrtSub (Subtitle):
     """
     def __init__ (self, file_in, file_out, unsafe_time_mode=False,
                   unsafe_number_mode=False, ignore_extra=False,
-                  make_progressive_num_block=False, start_sub_num=1):
-        """file_in and file_out must be file-like objects."""
+                  make_progressive_num_block=False, start_sub_num=1,
+                  keep_pos=False):
+        """*file_in* and *file_out* must be file-like objects.
+        *ignore_extra* is ignored :-D when *keep_pos* is True."""
         self.sub_num = start_sub_num
         self.time_sep = " --> "
         self.string_format = "%02d:%02d:%02d,%03d"
         reg_safe =   r'^(\d{2}):(\d{2}):(\d{2}),(\d{3})$'
         reg_unsafe = r'^(-{0,1}\d{1,}):(\d{2}):(\d{2}),(\d{3})$'
-        s = slice(None, -1) if ignore_extra else slice(None, None)
-        self.re_pattern = (reg_unsafe if unsafe_time_mode else reg_safe)[s]
+        _s = slice(None, -1) if ignore_extra else slice(None, None)
+        self.re_pattern = (reg_unsafe if unsafe_time_mode else reg_safe)[_s]
         self.unsafe_number_mode = unsafe_number_mode
         super().__init__(self.string_format, self.re_pattern)
+        self.end_t_reg = (self.RE_MATCH_TIME if not keep_pos
+                          else re.compile(
+                          r'^(\d{2}):(\d{2}):(\d{2}),(\d{3})(?=\s|$)(.*)?$'))
+        self._keep_pos_group = (1,2,3,4,5) if keep_pos else (1,2,3,4)
         self.file_in = file_in
         self.file_out = file_out
         self._sl = self._ml = self._sr = self._mr = 0 # stretch
@@ -683,10 +703,13 @@ class SrtSub (Subtitle):
         h, m, s, ms = list(map(int, self.match_time(start).group(1, 2, 3, 4)))
         new_start = self.string_format % self.times_from_secs(
             self.new_time(h, m, s+self._sl, ms+self._ml))
-        h, m, s, ms = list(map(int, self.match_time(end).group(1, 2, 3, 4)))
+        h, m, s, ms, *extra = self.match_time(
+            end, self.end_t_reg).group(*self._keep_pos_group)
+        h, m, s, ms = list(map(int, (h, m, s, ms)))
+        extra = extra[0] if extra else ''
         new_end = self.string_format % self.times_from_secs(
             self.new_time(h, m, s+self._sr, ms+self._mr))
-        return self.time_sep.join((new_start, new_end))
+        return self.time_sep.join((new_start, new_end)) + extra
 
     @iterdec(multicall=True)
     def text_block (self, line):
@@ -776,7 +799,8 @@ if __name__ == '__main__':
     if opts.subtitle_type == 'srt':
         newsub = SrtSub(in_file, out_file, opts.unsafe_time_mode,
                         opts.unsafe_number_mode, opts.ignore_extra,
-                        opts.prog_sub_num != None, opts.prog_sub_num)
+                        opts.prog_sub_num != None,
+                        opts.prog_sub_num, opts.preserve_extra)
         newsub.set_delta(opts.hour, opts.min, opts.sec, opts.ms, opts.num)
     elif opts.subtitle_type in ('sub', 'microdvd'):
         use_secs = any((opts.hour, opts.min, opts.sec, opts.ms))
