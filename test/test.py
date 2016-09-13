@@ -801,7 +801,7 @@ class MiscTest (unittest.TestCase):
                             inst.main()
                             with open(file, 'rb') as i, open(_out,'rb') as o:
                                 self.assertNotEqual(i.read(),o.read())
-                os.remove(_out)
+                    os.remove(_out)
 
     def testUtf8sigEncoding(self):
         file = op.join(CWD, DATA_DIR, '_enc_utf-8-sig.srt')
@@ -816,6 +816,7 @@ class MiscTest (unittest.TestCase):
                 inst.main()
             with open(file, 'rb') as i, open(_out,'rb') as o:
                 self.assertEqual(i.read(),o.read())
+            os.remove(_out)
         # fail
         with open(file, encoding=enc_fail) as fin:
             with tempfile.NamedTemporaryFile() as _fout:
