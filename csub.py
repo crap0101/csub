@@ -97,10 +97,10 @@ def numslice(n, i, keep_sign=False):
     '''
     n, sign_op = (n, operator.pos) if n > 0 else (abs(n), operator.neg)
     if not (i and n):
-        return sign_op(n) #raise ValueError('invalid number: %d' % i)
+        return sign_op(n)
     b = int(math.log10(n)) + 1
     if abs(i) > b:
-        return sign_op(n) #raise ValueError('invalid number: %d' % i)
+        return sign_op(n)
     m, g = ((b-i), 0) if i > 0 else (abs(i), 1)
     return sign_op(divmod(n, 10**m)[g]) if keep_sign else divmod(n, 10**m)[g]
 
@@ -135,7 +135,7 @@ def get_parser():
     parser.add_argument("--info", dest="info", action="store_true",
                         help="print informations about the program and exit.")
     parser.add_argument(
-        '--version', action='version', version='csub %s' % VERSION)
+        '--version', action='version', version='csub {}'.format(VERSION))
     # I/O options
     io_parser = parser.add_argument_group('Input and Output')
     io_parser.add_argument("-e", "--encoding",
@@ -324,7 +324,7 @@ class MismatchTimeError (BadFormatError):
         super().__init__()
         self.message = message
     def __str__ (self):
-        return "Invalid time format: %s" % self.message
+        return "Invalid time format: {}".format(self.message)
 
 
 class IndexNumError (BadFormatError):
@@ -333,7 +333,7 @@ class IndexNumError (BadFormatError):
         super().__init__()
         self.message = message
     def __str__ (self):
-        return "Invalid subtitle number: %s" % repr(self.message)
+        return "Invalid subtitle number: {!r}".format(self.message)
 
 
 class IncompleteBlockError (Warning):
@@ -359,14 +359,17 @@ class GetFunc:
 
 class Subtitle:
     """
-    Base class implementing common function for time manipulation
+    Base class implementing common functions for time manipulation
     and subtitles formatting.
     """
-    def __init__ (self, str_format='', re_pattern='.*'):
+    def __init__ (self, str_format='', re_pattern='.*', output_line_format='{}\n'):
         self.set_delta()
         self.STRING_FORMAT = str_format
         self.RE_MATCH_TIME = re.compile(re_pattern)
         self.RE_MATCH_NUMBER = re.compile('^-{0,1}\d+$')
+        self._delete_mode = False
+        self.OUTPUT_LINE_FORMAT = output_line_format
+        self.OUTPUT_LINE_FORMAT_DEL = ''
         self.MAX_H = 3600.0
         self.MAX_MIN = 60.0
         self.MAX_HNDRS = 100.0 # for SubStation Alpha
@@ -382,6 +385,17 @@ class Subtitle:
         self.actual_numline = 0
         self.stretch_left = self.stretch_right = 0.0
 
+    @property
+    def delete_mode (self):
+        return self._delete_mode
+    @delete_mode.setter
+    def delete_mode (self, bool_val):
+        self._delete_mode = bool_val
+            
+    @property
+    def output_line_fmt (self):
+        return (self.OUTPUT_LINE_FORMAT,
+                self.OUTPUT_LINE_FORMAT_DEL)[self.IN_RANGE and self.delete_mode]
     @property
     def stretch (self):
         return self.stretch_left, self.stretch_right
@@ -431,7 +445,7 @@ class Subtitle:
         matched = re.match(_re or self.RE_MATCH_TIME, string_time)
         if matched is None:
             raise MismatchTimeError(
-                "'%s' (in %s)" % (string_time, "match_time"))
+                "'{}' (in {})".format(string_time, "match_time"))
         return matched
 
     def new_sub_num (self, num_str):
@@ -470,7 +484,7 @@ class Subtitle:
         """
         get_func = GetFunc(itertools_cycle_iterator)
         for line, self.actual_numline in zip(lines, itertools.count(1)):
-            yield "%s\n" % get_func(line)
+            yield self.output_line_fmt.format(get_func(line))
 
     def times_from_secs (self, seconds):
         """
@@ -493,7 +507,7 @@ class MicroDVD (Subtitle):
         str_fmt = '{{{start:.0f}}}{{{end:.0f}}}{rest}\n'
         reg = '^{(\d+)}{(\d+)}(.*)$'
         reg_unsafe = '^{(-{0,1}\d+)}{(-{0,1}\d+)}(.*)$'
-        super().__init__(str_fmt, reg if not unsafe_time_mode else reg_unsafe)
+        super().__init__(str_fmt, reg if not unsafe_time_mode else reg_unsafe, str_fmt)
         self.frames = frames
         self.delta_frames = 0
         self.infile = file_in
@@ -530,7 +544,7 @@ class MicroDVD (Subtitle):
             *time, rest = self.match_time(line).groups()
             if self.check_range_to_edit(int(time[0])):
                 start, end = self.new_time(map(int, time))
-                self.outfile.write(self.STRING_FORMAT.format(
+                self.outfile.write(self.output_line_fmt.format(
                     start=start+self.stretch_left,
                     end=end+self.stretch_right,
                     rest=rest))
@@ -572,7 +586,7 @@ class AssSub (Subtitle):
         # milliseconds (to avoid rewrite methods in the base class).
 
     def _is_in_range (self, time_string):
-        """Return a string representing the the subtitle time."""
+        """Return a string representing the subtitle time."""
         h, m, s, hndrs = list(map(
             int, self.time_reg.match(time_string).groups()))
         return self.check_range_to_edit(h * self.MAX_H + m * self.MAX_MIN + s)
@@ -604,12 +618,12 @@ class AssSub (Subtitle):
                     line = ','.join((init, new_start, new_end, rest))
             except ValueError as err:
                 raise MismatchTimeError(
-                    "(%s) Something went wrong "
-                    "computing this line: %s" % (err, line))
+                    "({}) Something went wrong computing this line: {}".format(
+                        err, line))
             except AttributeError as err:
                 raise MismatchTimeError(
-                    "You probably need to --back-to-the-future\n"
-                    "ERR LINE IS: %s" % line)
+                    ("You probably need to --back-to-the-future"
+                     "ERR LINE IS: {}").format(line))
         return line
 
     def set_delta (self, hour=0, min_=0, sec=0, hndrs=0, *not_used):
@@ -619,7 +633,7 @@ class AssSub (Subtitle):
     def main (self):
         for self.actual_numline, line in zip(
             itertools.count(1), self.file_in):
-            self.file_out.write("%s\n" % self.parse_line(line))
+            self.file_out.write(self.output_line_fmt.format(self.parse_line(line)))
 
 
 class SrtSub (Subtitle):
@@ -635,7 +649,7 @@ class SrtSub (Subtitle):
         *ignore_extra* is ignored :-D when *keep_pos* is True."""
         self.sub_num = start_sub_num
         self.time_sep = " --> "
-        self.string_format = "%02d:%02d:%02d,%03d"
+        self.string_format = "{:02d}:{:02d}:{:02d},{:03d}"  ###XXX+TODO -d
         reg_safe =   r'^(\d{2}):(\d{2}):(\d{2}),(\d{3})$'
         reg_unsafe = r'^(-{0,1}\d{1,}):(\d{2}):(\d{2}),(\d{3})$'
         _s = slice(None, -1) if ignore_extra else slice(None, None)
@@ -698,17 +712,17 @@ class SrtSub (Subtitle):
             start, end = list(
                 map(str.strip, time_string.split(self.time_sep)))
         except ValueError:
-            raise MismatchTimeError("[at line %d] '%s' (in %s)"
-                 % (self.actual_numline, time_string, "time_block"))
+            raise MismatchTimeError("[at line {}] '{}' (in {})".format(
+                 self.actual_numline, time_string, "time_block"))
         h, m, s, ms = list(map(int, self.match_time(start).group(1, 2, 3, 4)))
-        new_start = self.string_format % self.times_from_secs(
-            self.new_time(h, m, s+self._sl, ms+self._ml))
+        new_start = self.string_format.format(*map(int, self.times_from_secs(
+            self.new_time(h, m, s+self._sl, ms+self._ml))))
         h, m, s, ms, *extra = self.match_time(
             end, self.end_t_reg).group(*self._keep_pos_group)
         h, m, s, ms = list(map(int, (h, m, s, ms)))
         extra = extra[0] if extra else ''
-        new_end = self.string_format % self.times_from_secs(
-            self.new_time(h, m, s+self._sr, ms+self._mr))
+        new_end = self.string_format.format(*map(int, self.times_from_secs(
+            self.new_time(h, m, s+self._sr, ms+self._mr))))
         return self.time_sep.join((new_start, new_end)) + extra
 
     @iterdec(multicall=True)
@@ -744,8 +758,8 @@ if __name__ == '__main__':
         sys.exit(0)
     if opts.same_file:
         if any((opts.infile, opts.outfile)):
-            print('{p}: -O/--same-file can not be used in conjunction with '
-                  '-i/--input-file or -o/--output-file'.format(p=sys.argv[0]),
+            print(('{}: -O/--same-file can not be used in conjunction with '
+                  '-i/--input-file or -o/--output-file').format(sys.argv[0]),
                   file=sys.stderr)
             sys.exit(1)
         else:
@@ -771,7 +785,7 @@ if __name__ == '__main__':
     if not opts.subtitle_type:
         parser.error("subtitle type (-t/--type) must be specified!")
     if opts.infile and not os.path.isfile(opts.infile):
-        parser.error("invalid input file '%s'" % opts.infile)
+        parser.error("invalid input file '{}'".format(opts.infile))
     if opts.subtitle_type != 'srt':
         for o, s in opt_err_pairs:
             if o:

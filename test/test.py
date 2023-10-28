@@ -106,8 +106,8 @@ class TempFileTest (unittest.TestCase):
                 pipe.communicate()[0]
                 retcode = pipe.returncode
                 self.assertNotEqual(retcode, 0,
-                                    "Retcode is %d | %s | %s |"
-                                    % (retcode, cmdline, subfile))
+                                    "Retcode is {:d} | {} | {} |".format(
+                                        retcode, cmdline, subfile))
                 with open(subfile) as f:
                     self.assertEqual(f.read(), orig,
                                      "sub file shouldn't be modified!")
@@ -133,8 +133,8 @@ class TempFileTest (unittest.TestCase):
                 pipe.communicate()[0]
                 retcode = pipe.returncode
                 self.assertNotEqual(retcode, 0,
-                                    "Retcode is %d | %s | %s |"
-                                    % (retcode, cmdline, subfile))
+                                    "Retcode is {:d} | {} | {} |".format(
+                                        retcode, cmdline, subfile))
                 with open(subfile) as f:
                     self.assertEqual(f.read(), orig,
                                      "sub file shouldn't be modified!")
@@ -163,8 +163,8 @@ class TempFileTest (unittest.TestCase):
                 pipe.communicate()[0]
                 retcode = pipe.returncode
                 self.assertNotEqual(retcode, 0,
-                                    "Retcode is %d | %s | %s |"
-                                    % (retcode, cmdline, subfile))
+                                    "Retcode is {:d} | {} | {} |".format(
+                                        retcode, cmdline, subfile))
                 with open(subfile) as f:
                     self.assertEqual(f.read(), orig,
                                      "sub file shouldn't be modified!")
@@ -290,10 +290,10 @@ class MicroDVDFIleTest (unittest.TestCase):
             outfile.seek(0)
             for l1, l2 in zip(infile, outfile):
                 match_1 = re.match(inst.RE_MATCH_TIME, l1)
-                self.assertTrue(match_1, msg="no match in line: %s" % l1)
+                self.assertTrue(match_1, msg="no match in line: {}".format(l1))
                 start1, end1, rest = match_1.groups()
                 match_2 = re.match(inst.RE_MATCH_TIME, l2)
-                self.assertTrue(match_2, msg="no match in line:'%s'" % l2)
+                self.assertTrue(match_2, msg="no match in line:'%s'".format(l2))
                 start2, end2, rest = match_2.groups()
                 self.assertEqual(int(start1) + sl, int(start2))
                 self.assertEqual(int(end1) + sr, int(end2))
@@ -400,10 +400,10 @@ class SrtFileTest (unittest.TestCase):
             random.shuffle(opts)
             for n in range(random.randint(1, lenopt)):
                 o, v = opts.pop(), random.randint(0, 999)
-                back_to.append("%s %d" % (o, -v))
-                choosed.append("%s %d" % (o, v))
-            cmdline.append('%s srt' %
-                           ('-t' if random.randint(0,1) else '--type'))
+                back_to.append("{} {:d}".format(o, -v))
+                choosed.append("{} {:d}".format(o, v))
+            cmdline.append('{} srt'.format(
+                           ('-t' if random.randint(0,1) else '--type')))
             cmdline = shlex.split(' '.join(cmdline))
             fpipe = sbp.Popen(["echo","-n",sub], shell=True, stdout=sbp.PIPE)
             spipe = sbp.Popen(cmdline, shell=True,
@@ -412,7 +412,7 @@ class SrtFileTest (unittest.TestCase):
             new_text = spipe.communicate()[0]
             retcode = spipe.returncode
             self.assertEqual(retcode, 0,
-                             "Retcode is %d %s %s" % (retcode, cmdline, sub))
+                             "Retcode is {:d} {} {}".format(retcode, cmdline, sub))
             fpipe = sbp.Popen(["echo", "-n", new_text],
                               shell=True, stdout=sbp.PIPE)
             spipe = sbp.Popen(cmdline, shell=True,
@@ -421,7 +421,7 @@ class SrtFileTest (unittest.TestCase):
             fpipe.stdout.close() 
             spipe.communicate()[0]
             retcode = spipe.returncode
-            self.assertEqual(retcode, 0, "Retcode is %d" %retcode)
+            self.assertEqual(retcode, 0, "Retcode is {}".format(retcode))
 
     def testFailSrtSubs (self):
         if platform.system() == 'Windows':
@@ -431,8 +431,8 @@ class SrtFileTest (unittest.TestCase):
                      SRT_FAKESUB_3_FAIL_TIME, SRT_FAKESUB_4_FAIL_TIME, 
                      SRT_FAKESUB_5_FAIL_TIME, SRT_FAKESUB_6_FAIL_TIME,]
         cmdline = [PYTHON_EXE, PROGFILE]
-        cmdline.append('%s srt' %
-                       ('-t' if random.randint(0,1) else '--type'))
+        cmdline.append('{} srt'.format(
+                       ('-t' if random.randint(0,1) else '--type')))
         cmdline = shlex.split(' '.join(cmdline))
         for sub in fail_list:
             fpipe = sbp.Popen(["echo", "-n"], shell=True, stdout=sbp.PIPE)
@@ -495,7 +495,7 @@ class SrtFileTest (unittest.TestCase):
             try:
                 newsub.main()
             except Exception as e:
-                msg = "it should be %s" % e
+                msg = "it should be {}".format(e)
                 self.assertNotEqual(e, csub.MismatchTimeError, msg)
                 self.assertNotEqual(e, csub.IndexNumError, msg)
 
@@ -534,12 +534,12 @@ class SrtReTest (unittest.TestCase):
         self.unsafe_subs = csub.SrtSub(None, None, True) # test unsafe mode
         for string in self.time_string_ok:
             self.assertTrue(self.subs.match_time(string),
-                            "Failed on %s" % string)
+                            "Failed on {}".format(string))
             self.assertTrue(self.unsafe_subs.match_time(string),
-                            "Failed on %s" % string)
+                            "Failed on {}".format(string))
         self.assertTrue(
             self.unsafe_subs.match_time(self.time_string_ok__unsafe),
-            "Failed on %s" % self.time_string_ok__unsafe)
+            "Failed on {}".format(self.time_string_ok__unsafe))
         for string in self.time_string_err:
             self.assertRaises(csub.MismatchTimeError,
                               self.subs.match_time, string)
@@ -556,7 +556,7 @@ class SrtReTest (unittest.TestCase):
     def testSrtReNumber (self):
         for string in self.number_string_ok:
             self.assertTrue((self.subs.new_sub_num(string) is not None),
-                            "Failed on %s" % string)
+                            "Failed on {}".format(string))
         for string in self.number_string_err:
             self.assertRaises(csub.IndexNumError,
                               self.subs.new_sub_num, string)
@@ -607,8 +607,8 @@ class SrtTimeTransformTest (unittest.TestCase):
         self.subs.set_delta(hours, mins, secs, ms, 0)
         h, m, s, ms = list(
             map(int, self.subs.match_time(string_time).group(1, 2, 3, 4)))
-        return self.subs.string_format % self.subs.times_from_secs(
-            self.subs.new_time(h, m, s, ms))
+        return self.subs.string_format.format(*map(int, self.subs.times_from_secs(
+            self.subs.new_time(h, m, s, ms))))
 
     def random_time (self, orig_time_string):
         _r = random.randint
@@ -628,14 +628,14 @@ class SrtTimeTransformTest (unittest.TestCase):
         self.subs = csub.SrtSub(None, None, True)
         for tlines in self.time_lines:
             self.assertEqual(tlines, self.subs.time_block(tlines)[0],
-                             "wrong time update in %s" % repr(tlines))
+                             "wrong time update in {!r}".format(tlines))
         for tlines in self.time_lines:
             self.assertEqual(tlines, self.random_time(tlines),
-                "wrong (random) time update in %s" % repr(tlines))
+                             "wrong (random) time update in {!r}".format(tlines))
         for strtime in self.time_strings:
             self.assertEqual(self.update_time(*strtime[0]),
                              strtime[1],
-                             "failed on %s"  % repr(strtime))
+                             "failed on {!r}".format(strtime))
     def testStretch (self):
         self.subs = csub.SrtSub(None, None, True)
         for _ in range(100):
@@ -643,7 +643,7 @@ class SrtTimeTransformTest (unittest.TestCase):
             for strtime in self.time_strings:
                 self.assertEqual(self.update_time(*strtime[0]),
                                  strtime[1],
-                                 "failed on %s"  % repr(strtime))
+                                 "failed on {!r}".format(strtime))
 
 
 class AssFileTest (unittest.TestCase):
@@ -840,7 +840,7 @@ class MiscTest (unittest.TestCase):
             cmd = shlex.split(cmdline.format(**cmd_dict))
             pipe = sbp.Popen(cmd, stdout=sbp.PIPE, stderr=sbp.PIPE)
             pipe.communicate()
-            self.assertEqual(pipe.returncode, 0, "%s" % (cmd))
+            self.assertEqual(pipe.returncode, 0, "{}".format(cmd))
             os.remove(cmd_dict['fout'])
         for enc in fake_encs:
             cmd_dict['enc'] = enc
@@ -924,5 +924,5 @@ if __name__ == '__main__':
         op.split(op.dirname(op.realpath(__file__)))[0], 'csub.py')
     unittest.TextTestRunner(verbosity=2).run(
         unittest.TestSuite(load_tests()))
-    for f in gglob("%s.py[oc]" % op.splitext(PROGFILE)[0]):
+    for f in gglob("{}.py[oc]".format(op.splitext(PROGFILE)[0])):
         os.remove(f)
